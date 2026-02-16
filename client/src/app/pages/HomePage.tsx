@@ -8,8 +8,8 @@ import { ImageSlider } from '../components/ImageSlider';
 import { Category, Product } from '../../data/products';
 import * as api from '../../services/api';
 import { Award, Shield, TrendingUp, Sparkles } from 'lucide-react';
-import c1 from '../../assets/c1.png';
-import c2 from '../../assets/c2.png';
+import c1 from '../../assets/c1.PNG';
+import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
