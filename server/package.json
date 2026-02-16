@@ -1,0 +1,30 @@
+{
+    "name": "khushit-backend",
+    "version": "1.0.0",
+    "description": "Backend API for Khushit e-commerce site",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "nodemon index.js"
+    },
+    "keywords": [
+        "api",
+        "express",
+        "ecommerce"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "compression": "^1.8.1",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "mongodb": "^6.15.0",
+        "multer": "^2.0.2",
+        "xlsx": "^0.18.5"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.9"
+    }
+}
