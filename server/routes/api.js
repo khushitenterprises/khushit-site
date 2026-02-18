@@ -205,6 +205,23 @@ async function getProductsData() {
     return cachedData;
 }
 
+function withDynamicProductCounts(categories = [], products = []) {
+    const countsByCategory = products.reduce((acc, product) => {
+        const categoryId = String(product.category || '');
+        if (!categoryId) {
+            return acc;
+        }
+
+        acc[categoryId] = (acc[categoryId] || 0) + 1;
+        return acc;
+    }, {});
+
+    return categories.map((category) => ({
+        ...category,
+        productCount: countsByCategory[category.id] || 0
+    }));
+}
+
 async function getSlidersData() {
     if (cachedSliders) {
         return cachedSliders;
@@ -502,7 +519,7 @@ router.delete('/admin/sliders/:id', requireAdmin, async (req, res) => {
 router.get('/categories', async (req, res) => {
     try {
         const data = await getProductsData();
-        res.json(data.categories);
+        res.json(withDynamicProductCounts(data.categories, data.products));
     } catch (error) {
         console.error('Error fetching categories:', error);
         res.status(500).json({ error: 'Failed to fetch categories' });
@@ -513,7 +530,8 @@ router.get('/categories', async (req, res) => {
 router.get('/categories/:id', async (req, res) => {
     try {
         const data = await getProductsData();
-        const category = data.categories.find(c => c.id === req.params.id);
+        const categoriesWithCounts = withDynamicProductCounts(data.categories, data.products);
+        const category = categoriesWithCounts.find(c => c.id === req.params.id);
 
         if (!category) {
             return res.status(404).json({ error: 'Category not found' });
