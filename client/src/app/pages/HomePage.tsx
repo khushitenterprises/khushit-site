@@ -5,34 +5,39 @@ import { Button } from '../components/Button';
 import { CategoryCard } from '../components/CategoryCard';
 import { ProductCard } from '../components/ProductCard';
 import { ImageSlider } from '../components/ImageSlider';
-import { Category, Product } from '../../data/products';
+import {
+  Category,
+  Product,
+  categories as fallbackCategories,
+  getFeaturedProducts as getFallbackFeaturedProducts,
+} from '../../data/products';
 import * as api from '../../services/api';
 import { Award, Shield, TrendingUp, Sparkles } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(getFallbackFeaturedProducts());
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        setLoading(true);
         const [categoriesData, productsData] = await Promise.all([
           api.getCategories(),
           api.getFeaturedProducts()
         ]);
-        setCategories(categoriesData);
-        setFeaturedProducts(productsData);
+        if (categoriesData.length) {
+          setCategories(categoriesData);
+        }
+        if (productsData.length) {
+          setFeaturedProducts(productsData);
+        }
         setError(null);
       } catch (err) {
-        setError('Failed to load data. Please make sure the backend server is running.');
+        setError('Live data is unavailable right now. Showing default content.');
         console.error('Error fetching data:', err);
-      } finally {
-        setLoading(false);
       }
     }
 
@@ -42,30 +47,15 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen">
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading products...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Error State */}
       {error && (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-            <h3 className="text-red-800 font-semibold mb-2">Error Loading Data</h3>
-            <p className="text-red-600 mb-4">{error}</p>
-            <p className="text-sm text-red-500">Make sure the backend server is running and your phone is on the same Wi-Fi network.</p>
+        <div className="px-4 pt-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-7xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {error}
           </div>
         </div>
       )}
 
-      {/* Main Content - only show when not loading and no error */}
-      {!loading && !error && (
-        <>
+      <>
           {/* Image Slider Section */}
           <ImageSlider />
 
@@ -213,8 +203,7 @@ export function HomePage() {
           </motion.div>
         </div>
       </section> */}
-        </>
-      )}
+      </>
     </div>
   );
 }

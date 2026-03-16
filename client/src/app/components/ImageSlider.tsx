@@ -112,9 +112,9 @@ export function ImageSlider() {
   return (
     <section className="w-full px-0 mt-20 mb-0">
       <div className="w-full">
-        <div className="relative w-full" style={{ aspectRatio: '16 / 6', maxHeight: '650px' }}>
+        <div className="relative w-full overflow-hidden" style={{ aspectRatio: '16 / 6', maxHeight: '650px' }}>
           <Carousel
-            className="w-full h-full"
+            className="w-full h-full overflow-hidden"
             opts={{
               loop: true,
               align: 'start',
@@ -132,9 +132,9 @@ export function ImageSlider() {
               });
             }}
           >
-            <CarouselContent>
+            <CarouselContent className="h-full">
               {visibleSliderImages.map((image, index) => (
-                <CarouselItem key={image.id}>
+                <CarouselItem key={image.id} className="h-full">
                   <div
                     className="relative w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
                   >
