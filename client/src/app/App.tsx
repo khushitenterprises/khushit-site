@@ -50,12 +50,9 @@ function AppShell() {
       return;
     }
 
-    const timer = setTimeout(() => {
-      setShowRegistration(true);
-    }, 5000);
+    setShowRegistration(true);
 
     return () => {
-      clearTimeout(timer);
       if (reopenTimerRef.current) {
         clearTimeout(reopenTimerRef.current);
       }
@@ -88,7 +85,7 @@ function AppShell() {
       if (!isDone) {
         setShowRegistration(true);
       }
-    }, 10000);
+    }, 5 * 60 * 1000);
   };
 
   const handleOpenRegistration = () => {
