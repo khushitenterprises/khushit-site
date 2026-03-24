@@ -23,37 +23,6 @@ const upload = multer({
 let cachedData = null;
 let cachedSliders = null;
 
-const defaultSliders = [
-    {
-        id: 'sld_1',
-        src: '/allairdrops.jpeg',
-        alt: 'Product showcase 1',
-        title: 'Premium Quality Products',
-        link: '/products/airdrops'
-    },
-    {
-        id: 'sld_2',
-        src: '/allairdrops.jpeg',
-        alt: 'Product showcase 2',
-        title: 'Trusted by Thousands',
-        link: ''
-    },
-    {
-        id: 'sld_3',
-        src: '/allairdrops.jpeg',
-        alt: 'Product showcase 3',
-        title: 'Daily Essentials',
-        link: ''
-    },
-    {
-        id: 'sld_4',
-        src: '/allairdrops.jpeg',
-        alt: 'Product showcase 4',
-        title: 'Excellence in Every Product',
-        link: ''
-    }
-];
-
 function isValidAdmin(email, password) {
     return email === ADMIN_EMAIL && password === ADMIN_PASSWORD;
 }
@@ -231,23 +200,10 @@ async function getSlidersData() {
     const slidersCollection = db.collection('sliders');
     const sliders = await slidersCollection.find({}).sort({ createdAt: 1, id: 1 }).toArray();
 
-    if (sliders.length === 0) {
-        const seed = defaultSliders.map((slider) => ({
-            ...slider,
-            createdAt: new Date()
-        }));
-        await slidersCollection.insertMany(seed);
-        const seeded = await slidersCollection.find({}).sort({ createdAt: 1, id: 1 }).toArray();
-        cachedSliders = seeded.map(({ _id, createdAt, ...rest }) => ({
-            ...rest,
-            src: String(rest.src || '').replace('/allairdrop.jpeg', '/allairdrops.jpeg')
-        }));
-    } else {
-        cachedSliders = sliders.map(({ _id, createdAt, ...rest }) => ({
-            ...rest,
-            src: String(rest.src || '').replace('/allairdrop.jpeg', '/allairdrops.jpeg')
-        }));
-    }
+    cachedSliders = sliders.map(({ _id, createdAt, ...rest }) => ({
+        ...rest,
+        src: String(rest.src || '').replace('/allairdrop.jpeg', '/allairdrops.jpeg')
+    }));
 
     return cachedSliders;
 }
