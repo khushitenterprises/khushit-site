@@ -6,7 +6,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from './ui/carousel';
-import logopImage from '../../assets/logop.png';
 
 interface SliderImage {
   id: string;
@@ -16,44 +15,14 @@ interface SliderImage {
   link?: string;
 }
 
-const fallbackSliderImages: SliderImage[] = [
-  {
-    id: 'sld_1',
-    src: logopImage,
-    alt: 'Product showcase 1',
-    title: 'Premium Quality Products',
-    link: '/products/airdrops',
-  },
-  {
-    id: 'sld_2',
-    src: logopImage,
-    alt: 'Product showcase 2',
-    title: 'Trusted by Thousands',
-  },
-  {
-    id: 'sld_3',
-    src: logopImage,
-    alt: 'Product showcase 3',
-    title: 'Daily Essentials',
-  },
-  {
-    id: 'sld_4',
-    src: logopImage,
-    alt: 'Product showcase 4',
-    title: 'Excellence in Every Product',
-  },
-];
-
 export function ImageSlider() {
   const apiBase = useMemo(() => import.meta.env.VITE_API_URL || '', []);
-  const [sliderImages, setSliderImages] = useState<SliderImage[]>(fallbackSliderImages);
+  const [sliderImages, setSliderImages] = useState<SliderImage[]>([]);
   const [failedImageIds, setFailedImageIds] = useState<string[]>([]);
-  const [current, setCurrent] = useState(0);
   const carouselApiRef = useRef<any>(null);
   const [isAutoplay, setIsAutoplay] = useState(true);
   const visibleSliderImages = useMemo(() => {
-    const visible = sliderImages.filter((image) => !failedImageIds.includes(image.id));
-    return visible.length ? visible : fallbackSliderImages;
+    return sliderImages.filter((image) => !failedImageIds.includes(image.id));
   }, [sliderImages, failedImageIds]);
 
   useEffect(() => {
@@ -75,19 +44,17 @@ export function ImageSlider() {
           .filter((item) => item && item.id && String(item.src || '').trim() && item.title)
           .map((item) => ({
             id: String(item.id),
-            src: String(item.src).trim().replace('/allairdrop.jpeg', '/allairdrops.jpeg'),
+            src: String(item.src).trim(),
             alt: String(item.alt || item.title),
             title: String(item.title),
             link: item.link ? String(item.link) : '',
           }));
 
-        if (cleaned.length) {
-          setSliderImages(cleaned);
-          setFailedImageIds([]);
-          setCurrent(0);
-        }
+        setSliderImages(cleaned);
+        setFailedImageIds([]);
       } catch {
-        // Keep fallback slider images when API is unavailable.
+        setSliderImages([]);
+        setFailedImageIds([]);
       }
     };
 
@@ -99,7 +66,7 @@ export function ImageSlider() {
   }, [apiBase]);
 
   useEffect(() => {
-    if (!isAutoplay) return;
+    if (!isAutoplay || visibleSliderImages.length < 2) return;
 
     const timer = setInterval(() => {
       if (carouselApiRef.current) {
@@ -108,7 +75,7 @@ export function ImageSlider() {
     }, 3000);
 
     return () => clearInterval(timer);
-  }, [isAutoplay]);
+  }, [isAutoplay, visibleSliderImages.length]);
 
   useEffect(() => {
     visibleSliderImages.slice(0, 3).forEach((image) => {
@@ -117,6 +84,10 @@ export function ImageSlider() {
       preloadImage.src = image.src;
     });
   }, [visibleSliderImages]);
+
+  if (visibleSliderImages.length === 0) {
+    return null;
+  }
 
   return (
     <section className="w-full px-0 mt-20 mb-0">
@@ -133,9 +104,6 @@ export function ImageSlider() {
             setApi={(api: any) => {
               carouselApiRef.current = api;
               if (!api) return;
-              api.on('select', () => {
-                setCurrent(api.selectedScrollSnap());
-              });
               api.on('pointerDown', () => {
                 setIsAutoplay(false);
               });
