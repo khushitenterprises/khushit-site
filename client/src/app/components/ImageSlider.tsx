@@ -6,6 +6,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from './ui/carousel';
+import logopImage from '../../assets/logop.png';
 
 interface SliderImage {
   id: string;
@@ -18,26 +19,26 @@ interface SliderImage {
 const fallbackSliderImages: SliderImage[] = [
   {
     id: 'sld_1',
-    src: '/allairdrops.jpeg',
+    src: logopImage,
     alt: 'Product showcase 1',
     title: 'Premium Quality Products',
     link: '/products/airdrops',
   },
   {
     id: 'sld_2',
-    src: '/allairdrops.jpeg',
+    src: logopImage,
     alt: 'Product showcase 2',
     title: 'Trusted by Thousands',
   },
   {
     id: 'sld_3',
-    src: '/allairdrops.jpeg',
+    src: logopImage,
     alt: 'Product showcase 3',
     title: 'Daily Essentials',
   },
   {
     id: 'sld_4',
-    src: '/allairdrops.jpeg',
+    src: logopImage,
     alt: 'Product showcase 4',
     title: 'Excellence in Every Product',
   },
@@ -108,6 +109,14 @@ export function ImageSlider() {
 
     return () => clearInterval(timer);
   }, [isAutoplay]);
+
+  useEffect(() => {
+    visibleSliderImages.slice(0, 3).forEach((image) => {
+      const preloadImage = new Image();
+      preloadImage.decoding = 'async';
+      preloadImage.src = image.src;
+    });
+  }, [visibleSliderImages]);
 
   return (
     <section className="w-full px-0 mt-20 mb-0">
