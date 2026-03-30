@@ -19,42 +19,43 @@ import c2 from '../../assets/c2.PNG';
 export function HomePage() {
   const [categories, setCategories] = useState<Category[]>(fallbackCategories);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>(getFallbackFeaturedProducts());
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchData() {
-      try {
-        const [categoriesData, productsData] = await Promise.all([
-          api.getCategories(),
-          api.getFeaturedProducts()
-        ]);
-        if (categoriesData.length) {
-          setCategories(categoriesData);
-        }
-        if (productsData.length) {
-          setFeaturedProducts(productsData);
-        }
-        setError(null);
-      } catch (err) {
-        setError('Live data is unavailable right now. Showing default content.');
-        console.error('Error fetching data:', err);
+      const [categoriesResult, productsResult] = await Promise.allSettled([
+        api.getCategories(),
+        api.getFeaturedProducts()
+      ]);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (categoriesResult.status === 'fulfilled' && categoriesResult.value.length) {
+        setCategories(categoriesResult.value);
+      } else if (categoriesResult.status === 'rejected') {
+        console.error('Error fetching categories:', categoriesResult.reason);
+      }
+
+      if (productsResult.status === 'fulfilled' && productsResult.value.length) {
+        setFeaturedProducts(productsResult.value);
+      } else if (productsResult.status === 'rejected') {
+        console.error('Error fetching featured products:', productsResult.reason);
       }
     }
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
 
   return (
     <div className="min-h-screen">
-      {error && (
-        <div className="px-4 pt-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {error}
-          </div>
-        </div>
-      )}
-
       <>
           {/* Image Slider Section */}
           <ImageSlider />
