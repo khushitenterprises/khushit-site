@@ -15,27 +15,6 @@ interface SliderImage {
   link?: string;
 }
 
-const FALLBACK_SLIDER_IMAGES: SliderImage[] = [
-  {
-    id: 'fallback-1',
-    src: '/g1.jpeg',
-    alt: 'Khushit product showcase',
-    title: 'Khushit Product Showcase',
-  },
-  {
-    id: 'fallback-2',
-    src: '/ab.jpeg',
-    alt: 'Khushit brand banner',
-    title: 'Khushit Brand Banner',
-  },
-  {
-    id: 'fallback-3',
-    src: '/pxfuel.jpg',
-    alt: 'Khushit featured range',
-    title: 'Khushit Featured Range',
-  },
-];
-
 export function ImageSlider() {
   const apiBase = useMemo(() => import.meta.env.VITE_API_URL || '', []);
   const [sliderImages, setSliderImages] = useState<SliderImage[]>([]);
@@ -45,15 +24,8 @@ export function ImageSlider() {
   const visibleSliderImages = useMemo(() => {
     return sliderImages.filter((image) => !failedImageIds.includes(image.id));
   }, [sliderImages, failedImageIds]);
-  const visibleFallbackImages = useMemo(() => {
-    return FALLBACK_SLIDER_IMAGES.filter((image) => !failedImageIds.includes(image.id));
-  }, [failedImageIds]);
-  const displayImages = useMemo(() => {
-    if (visibleSliderImages.length > 0) {
-      return visibleSliderImages;
-    }
-    return visibleFallbackImages;
-  }, [visibleSliderImages, visibleFallbackImages]);
+  const displayImages = visibleSliderImages;
+
 
   useEffect(() => {
     let isMounted = true;
