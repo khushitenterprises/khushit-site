@@ -42,14 +42,18 @@ export function ImageSlider() {
         }
 
         const cleaned = data
-          .filter((item) => item && item.id && String(item.src || '').trim() && item.title)
-          .map((item) => ({
-            id: String(item.id),
-            src: String(item.src).trim(),
-            alt: String(item.alt || item.title),
-            title: String(item.title),
-            link: item.link ? String(item.link) : '',
-          }));
+          .map((item, index) => {
+            const src = String((item as any)?.src || (item as any)?.image || '').trim();
+            const title = String((item as any)?.title || (item as any)?.alt || '').trim();
+            return {
+              id: String((item as any)?.id || `slider-${index + 1}`),
+              src,
+              alt: String((item as any)?.alt || title),
+              title,
+              link: (item as any)?.link ? String((item as any).link) : '',
+            };
+          })
+          .filter((item) => item.src && item.title);
 
         setSliderImages(cleaned);
         setFailedImageIds([]);

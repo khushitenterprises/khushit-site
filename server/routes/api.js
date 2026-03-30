@@ -195,10 +195,23 @@ async function getSlidersData() {
     const slidersCollection = db.collection('sliders');
     const sliders = await slidersCollection.find({}).sort({ createdAt: 1, id: 1 }).toArray();
 
-    return sliders.map(({ _id, createdAt, ...rest }) => ({
-        ...rest,
-        src: String(rest.src || '').replace('/allairdrop.jpeg', '/allairdrops.jpeg')
-    }));
+    return sliders
+        .map(({ _id, createdAt, ...rest }) => {
+            const id = String(rest.id || _id || '').trim();
+            const title = String(rest.title || rest.alt || '').trim();
+            const alt = String(rest.alt || rest.title || '').trim();
+            const link = String(rest.link || '').trim();
+            const src = String(rest.src || rest.image || '').trim().replace('/allairdrop.jpeg', '/allairdrops.jpeg');
+
+            return {
+                id,
+                title,
+                alt,
+                link,
+                src
+            };
+        })
+        .filter((item) => item.id && item.src && item.title);
 }
 
 router.post('/admin/login', (req, res) => {
