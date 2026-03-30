@@ -43,8 +43,10 @@ export function ImageSlider() {
 
         const cleaned = data
           .map((item, index) => {
-            const src = String((item as any)?.src || (item as any)?.image || '').trim();
-            const title = String((item as any)?.title || (item as any)?.alt || '').trim();
+            const src = String(
+              (item as any)?.src || (item as any)?.image || (item as any)?.url || (item as any)?.photo || ''
+            ).trim();
+            const title = String((item as any)?.title || (item as any)?.alt || `Slider ${index + 1}`).trim();
             return {
               id: String((item as any)?.id || `slider-${index + 1}`),
               src,
@@ -53,7 +55,7 @@ export function ImageSlider() {
               link: (item as any)?.link ? String((item as any).link) : '',
             };
           })
-          .filter((item) => item.src && item.title);
+          .filter((item) => item.src);
 
         setSliderImages(cleaned);
         setFailedImageIds([]);

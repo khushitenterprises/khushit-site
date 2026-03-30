@@ -196,12 +196,14 @@ async function getSlidersData() {
     const sliders = await slidersCollection.find({}).sort({ createdAt: 1, id: 1 }).toArray();
 
     return sliders
-        .map(({ _id, createdAt, ...rest }) => {
-            const id = String(rest.id || _id || '').trim();
-            const title = String(rest.title || rest.alt || '').trim();
-            const alt = String(rest.alt || rest.title || '').trim();
+        .map(({ _id, createdAt, ...rest }, index) => {
+            const id = String(rest.id || _id || `sld_${index + 1}`).trim();
+            const title = String(rest.title || rest.alt || `Slider ${index + 1}`).trim();
+            const alt = String(rest.alt || rest.title || title).trim();
             const link = String(rest.link || '').trim();
-            const src = String(rest.src || rest.image || '').trim().replace('/allairdrop.jpeg', '/allairdrops.jpeg');
+            const src = String(rest.src || rest.image || rest.url || rest.photo || '')
+                .trim()
+                .replace('/allairdrop.jpeg', '/allairdrops.jpeg');
 
             return {
                 id,
@@ -211,7 +213,7 @@ async function getSlidersData() {
                 src
             };
         })
-        .filter((item) => item.id && item.src && item.title);
+        .filter((item) => item.src);
 }
 
 router.post('/admin/login', (req, res) => {
