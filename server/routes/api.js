@@ -21,7 +21,6 @@ const upload = multer({
 
 // In-memory cache for ultra-fast responses
 let cachedData = null;
-let cachedSliders = null;
 
 function isValidAdmin(email, password) {
     return email === ADMIN_EMAIL && password === ADMIN_PASSWORD;
@@ -192,20 +191,14 @@ function withDynamicProductCounts(categories = [], products = []) {
 }
 
 async function getSlidersData() {
-    if (cachedSliders) {
-        return cachedSliders;
-    }
-
     const db = await getDb();
     const slidersCollection = db.collection('sliders');
     const sliders = await slidersCollection.find({}).sort({ createdAt: 1, id: 1 }).toArray();
 
-    cachedSliders = sliders.map(({ _id, createdAt, ...rest }) => ({
+    return sliders.map(({ _id, createdAt, ...rest }) => ({
         ...rest,
         src: String(rest.src || '').replace('/allairdrop.jpeg', '/allairdrops.jpeg')
     }));
-
-    return cachedSliders;
 }
 
 router.post('/admin/login', (req, res) => {
@@ -388,8 +381,6 @@ router.post('/admin/sliders', requireAdmin, upload.single('image'), async (req, 
         };
 
         await slidersCollection.insertOne(slider);
-        cachedSliders = null;
-
         const { createdAt, ...responseBody } = slider;
         return res.status(201).json(responseBody);
     } catch (error) {
@@ -436,8 +427,6 @@ router.put('/admin/sliders/:id', requireAdmin, upload.single('image'), async (re
             }
         );
 
-        cachedSliders = null;
-
         return res.json({
             id: sliderId,
             ...update
@@ -461,8 +450,6 @@ router.delete('/admin/sliders/:id', requireAdmin, async (req, res) => {
         if (result.deletedCount === 0) {
             return res.status(404).json({ error: 'Slider not found' });
         }
-
-        cachedSliders = null;
 
         return res.status(204).send();
     } catch (error) {

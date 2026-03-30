@@ -21,11 +21,10 @@ export function ImageSlider() {
   const [failedImageIds, setFailedImageIds] = useState<string[]>([]);
   const carouselApiRef = useRef<any>(null);
   const [isAutoplay, setIsAutoplay] = useState(true);
-  const visibleSliderImages = useMemo(() => {
-    return sliderImages.filter((image) => !failedImageIds.includes(image.id));
-  }, [sliderImages, failedImageIds]);
-  const displayImages = visibleSliderImages;
-
+  const displayImages = useMemo(
+    () => sliderImages.filter((image) => !failedImageIds.includes(image.id)),
+    [sliderImages, failedImageIds]
+  );
 
   useEffect(() => {
     let isMounted = true;
