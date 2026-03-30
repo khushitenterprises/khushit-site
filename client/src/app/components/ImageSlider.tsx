@@ -15,6 +15,27 @@ interface SliderImage {
   link?: string;
 }
 
+const FALLBACK_SLIDER_IMAGES: SliderImage[] = [
+  {
+    id: 'fallback-1',
+    src: '/g1.jpeg',
+    alt: 'Khushit product showcase',
+    title: 'Khushit Product Showcase',
+  },
+  {
+    id: 'fallback-2',
+    src: '/ab.jpeg',
+    alt: 'Khushit brand banner',
+    title: 'Khushit Brand Banner',
+  },
+  {
+    id: 'fallback-3',
+    src: '/pxfuel.jpg',
+    alt: 'Khushit featured range',
+    title: 'Khushit Featured Range',
+  },
+];
+
 export function ImageSlider() {
   const apiBase = useMemo(() => import.meta.env.VITE_API_URL || '', []);
   const [sliderImages, setSliderImages] = useState<SliderImage[]>([]);
@@ -24,6 +45,15 @@ export function ImageSlider() {
   const visibleSliderImages = useMemo(() => {
     return sliderImages.filter((image) => !failedImageIds.includes(image.id));
   }, [sliderImages, failedImageIds]);
+  const visibleFallbackImages = useMemo(() => {
+    return FALLBACK_SLIDER_IMAGES.filter((image) => !failedImageIds.includes(image.id));
+  }, [failedImageIds]);
+  const displayImages = useMemo(() => {
+    if (visibleSliderImages.length > 0) {
+      return visibleSliderImages;
+    }
+    return visibleFallbackImages;
+  }, [visibleSliderImages, visibleFallbackImages]);
 
   useEffect(() => {
     let isMounted = true;
@@ -66,7 +96,7 @@ export function ImageSlider() {
   }, [apiBase]);
 
   useEffect(() => {
-    if (!isAutoplay || visibleSliderImages.length < 2) return;
+    if (!isAutoplay || displayImages.length < 2) return;
 
     const timer = setInterval(() => {
       if (carouselApiRef.current) {
@@ -75,17 +105,17 @@ export function ImageSlider() {
     }, 3000);
 
     return () => clearInterval(timer);
-  }, [isAutoplay, visibleSliderImages.length]);
+  }, [isAutoplay, displayImages.length]);
 
   useEffect(() => {
-    visibleSliderImages.slice(0, 3).forEach((image) => {
+    displayImages.slice(0, 3).forEach((image) => {
       const preloadImage = new Image();
       preloadImage.decoding = 'async';
       preloadImage.src = image.src;
     });
-  }, [visibleSliderImages]);
+  }, [displayImages]);
 
-  if (visibleSliderImages.length === 0) {
+  if (displayImages.length === 0) {
     return null;
   }
 
@@ -110,7 +140,7 @@ export function ImageSlider() {
             }}
           >
             <CarouselContent className="h-full">
-              {visibleSliderImages.map((image, index) => (
+              {displayImages.map((image, index) => (
                 <CarouselItem key={image.id} className="h-full">
                   <div
                     className="relative w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
