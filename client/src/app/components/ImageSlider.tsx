@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Carousel,
   CarouselContent,
@@ -13,12 +13,37 @@ interface SliderImage {
   link?: string;
 }
 
+const DEFAULT_SLIDER_IMAGES: SliderImage[] = [
+  {
+    id: 'slider-1',
+    src: '/Febric%20Conditionar%20Bnner.jpg',
+    alt: 'Fabric Conditioner Banner',
+    title: 'Fabric Conditioner',
+  },
+  {
+    id: 'slider-2',
+    src: '/Khushit%20Shampoo%20Banner.jpg',
+    alt: 'Khushit Shampoo Banner',
+    title: 'Khushit Shampoo',
+  },
+  {
+    id: 'slider-3',
+    src: '/Beauti%20Soap%20Banner.jpg',
+    alt: 'Beauti Soap Banner',
+    title: 'Beauti Soap',
+  },
+  {
+    id: 'slider-4',
+    src: '/Airdrop%20Banner.jpg',
+    alt: 'Airdrops Banner',
+    title: 'Airdrops',
+  },
+];
+
 export function ImageSlider() {
-  const apiBase = useMemo(() => import.meta.env.VITE_API_URL || '', []);
-  const [sliderImages, setSliderImages] = useState<SliderImage[]>([]);
   const carouselApiRef = useRef<any>(null);
   const [isAutoplay, setIsAutoplay] = useState(true);
-  const displayImages = useMemo(() => sliderImages, [sliderImages]);
+  const displayImages = DEFAULT_SLIDER_IMAGES;
   const brokenImagePlaceholder =
     'data:image/svg+xml;utf8,' +
     encodeURIComponent(
@@ -29,92 +54,6 @@ export function ImageSlider() {
         </text>
       </svg>`
     );
-  const apiCandidates = useMemo(() => {
-    const candidates = new Set<string>();
-    candidates.add(apiBase);
-    candidates.add('');
-
-    if (import.meta.env.DEV && typeof window !== 'undefined') {
-      const protocol = window.location.protocol || 'http:';
-      const host = window.location.hostname || 'localhost';
-      candidates.add(window.location.origin);
-
-      for (let port = 5000; port <= 5010; port += 1) {
-        candidates.add(`${protocol}//${host}:${port}`);
-        candidates.add(`http://${host}:${port}`);
-        candidates.add(`https://${host}:${port}`);
-      }
-    }
-
-    return Array.from(candidates);
-  }, [apiBase]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadSliders = async () => {
-      try {
-        let data: SliderImage[] = [];
-        let loaded = false;
-
-        for (const base of apiCandidates) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = window.setTimeout(() => controller.abort(), 3500);
-            const response = await fetch(`${base}/api/sliders`, {
-              signal: controller.signal,
-            });
-            window.clearTimeout(timeoutId);
-
-            if (!response.ok) {
-              continue;
-            }
-
-            const nextData = (await response.json()) as SliderImage[];
-            if (Array.isArray(nextData)) {
-              data = nextData;
-              loaded = true;
-              break;
-            }
-          } catch {
-            continue;
-          }
-        }
-
-        if (!loaded || !isMounted || data.length === 0) {
-          return;
-        }
-
-        const cleaned = data
-          .map((item, index) => {
-            const src = String(
-              (item as any)?.src || (item as any)?.image || (item as any)?.url || (item as any)?.photo || ''
-            ).trim();
-            const title = String((item as any)?.title || (item as any)?.alt || `Slider ${index + 1}`).trim();
-            return {
-              id: String((item as any)?.id || `slider-${index + 1}`),
-              src,
-              alt: String((item as any)?.alt || title),
-              title,
-              link: (item as any)?.link ? String((item as any).link) : '',
-            };
-          })
-          .filter((item) => item.src);
-
-        if (cleaned.length > 0) {
-          setSliderImages(cleaned);
-        }
-      } catch {
-        console.error('Unable to load sliders from API');
-      }
-    };
-
-    loadSliders();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [apiCandidates]);
 
   useEffect(() => {
     if (!isAutoplay || displayImages.length < 2) return;
@@ -180,6 +119,7 @@ export function ImageSlider() {
                         element.src = brokenImagePlaceholder;
                       }}
                     />
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-black/10 to-transparent pointer-events-none" />
                   </div>
                 </CarouselItem>
               ))}
