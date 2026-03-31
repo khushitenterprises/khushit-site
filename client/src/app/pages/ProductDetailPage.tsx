@@ -5,9 +5,33 @@ import { ChevronRight, CheckCircle2 } from 'lucide-react';
 import {
   Category,
   Product,
-  getCategoryById as getFallbackCategoryById,
+  categories as mainCategories,
 } from '../../data/products';
 import * as api from '../../services/api';
+
+function toSlug(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function resolveMainCategory(routeCategoryId: string): Category | null {
+  const aliases: Record<string, string[]> = {
+    airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
+    handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
+    toiletries: ['toiletry', 'personal-care', 'personalcare'],
+  };
+  const routeKey = toSlug(routeCategoryId);
+
+  return (
+    mainCategories.find((item) => {
+      const keys = [item.id, item.name, ...(aliases[item.id] || [])].map(toSlug);
+      return keys.includes(routeKey);
+    }) || null
+  );
+}
 
 function buildTagline(product: Product, category: Category | null): string {
   if (product.variant) {
@@ -34,15 +58,20 @@ export function ProductDetailPage() {
 
       try {
         setLoading(true);
-        const [categoryResult, productsResult] = await Promise.allSettled([
-          api.getCategoryById(categoryId),
-          api.getProductsByCategory(categoryId)
-        ]);
+        const fallbackCategory = resolveMainCategory(categoryId);
+        const resolvedCategoryId = fallbackCategory?.id || categoryId;
+        const productsResult = await Promise.allSettled([api.getProductsByCategory(resolvedCategoryId)]);
 
         const categoryData =
-          getFallbackCategoryById(categoryId) ||
-          (categoryResult.status === 'fulfilled' ? categoryResult.value : null);
-        const productsData = productsResult.status === 'fulfilled' ? productsResult.value : [];
+          fallbackCategory ||
+          ({
+            id: resolvedCategoryId,
+            name: resolvedCategoryId.replace(/-/g, ' '),
+            description: '',
+            icon: '📦',
+            productCount: 0
+          } as Category);
+        const productsData = productsResult[0].status === 'fulfilled' ? productsResult[0].value : [];
 
         const matchedProduct =
           productsData.find((item) => item.id === productId) ||
