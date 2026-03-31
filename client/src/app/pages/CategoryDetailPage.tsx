@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ProductCard } from '../components/ProductCard';
-import { Product, Category } from '../../data/products';
+import { Product, Category, getCategoryById as getFallbackCategoryById, getProductsByCategory as getFallbackProductsByCategory } from '../../data/products';
 import * as api from '../../services/api';
 import { ChevronRight, Filter } from 'lucide-react';
 
@@ -21,16 +21,39 @@ export function CategoryDetailPage() {
 
       try {
         setLoading(true);
-        const [categoryData, productsData] = await Promise.all([
+        const [categoryResult, productsResult] = await Promise.allSettled([
           api.getCategoryById(categoryId),
           api.getProductsByCategory(categoryId)
         ]);
-        setCategory(categoryData);
-        setProducts(productsData);
-        setFilteredProducts(productsData);
+
+        const fallbackCategory = getFallbackCategoryById(categoryId) || null;
+        const fallbackProducts = getFallbackProductsByCategory(categoryId);
+
+        const nextCategory = categoryResult.status === 'fulfilled' ? categoryResult.value : fallbackCategory;
+        const nextProducts = productsResult.status === 'fulfilled' && productsResult.value.length
+          ? productsResult.value
+          : fallbackProducts;
+
+        if (!nextCategory) {
+          setError('Failed to load category data');
+          return;
+        }
+
+        setCategory(nextCategory);
+        setProducts(nextProducts);
+        setFilteredProducts(nextProducts);
         setError(null);
       } catch (err) {
-        setError('Failed to load category data');
+        const fallbackCategory = getFallbackCategoryById(categoryId) || null;
+        const fallbackProducts = getFallbackProductsByCategory(categoryId);
+        if (fallbackCategory) {
+          setCategory(fallbackCategory);
+          setProducts(fallbackProducts);
+          setFilteredProducts(fallbackProducts);
+          setError(null);
+        } else {
+          setError('Failed to load category data');
+        }
         console.error('Error fetching category data:', err);
       } finally {
         setLoading(false);

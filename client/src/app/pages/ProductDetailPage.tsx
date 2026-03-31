@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ChevronRight, CheckCircle2 } from 'lucide-react';
-import { Category, Product } from '../../data/products';
+import {
+  Category,
+  Product,
+  getCategoryById as getFallbackCategoryById,
+  getProductsByCategory as getFallbackProductsByCategory,
+} from '../../data/products';
 import * as api from '../../services/api';
 
 function buildTagline(product: Product, category: Category | null): string {
@@ -30,14 +35,24 @@ export function ProductDetailPage() {
 
       try {
         setLoading(true);
-        const [categoryData, productsData] = await Promise.all([
+        const [categoryResult, productsResult] = await Promise.allSettled([
           api.getCategoryById(categoryId),
           api.getProductsByCategory(categoryId)
         ]);
 
-        const matchedProduct = productsData.find((item) => item.id === productId) || null;
+        const categoryData =
+          categoryResult.status === 'fulfilled' ? categoryResult.value : getFallbackCategoryById(categoryId) || null;
+        const productsData =
+          productsResult.status === 'fulfilled' && productsResult.value.length
+            ? productsResult.value
+            : getFallbackProductsByCategory(categoryId);
 
-        if (!matchedProduct) {
+        const matchedProduct =
+          productsData.find((item) => item.id === productId) ||
+          productsData.find((item) => item.id === decodeURIComponent(productId)) ||
+          null;
+
+        if (!matchedProduct || !categoryData) {
           setError('Product not found');
         } else {
           setCategory(categoryData);

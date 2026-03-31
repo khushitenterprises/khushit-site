@@ -3,6 +3,41 @@ import { Product, Category } from '../data/products';
 const envApiUrl = import.meta.env.VITE_API_URL;
 const API_URL = envApiUrl || '';
 
+function toSlug(value: string): string {
+    return String(value || '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function normalizeCategory(raw: any): Category {
+    const id = String(raw?.id || raw?.categoryId || toSlug(raw?.name || '')).trim();
+    return {
+        id,
+        name: String(raw?.name || id || 'Category').trim(),
+        description: String(raw?.description || '').trim(),
+        icon: String(raw?.icon || '').trim(),
+        productCount: Number(raw?.productCount || 0),
+    };
+}
+
+function normalizeProduct(raw: any): Product {
+    const name = String(raw?.name || raw?.title || '').trim();
+    return {
+        id: String(raw?.id || raw?.productId || toSlug(name) || `product-${Date.now()}`).trim(),
+        name,
+        description: String(raw?.description || '').trim(),
+        category: String(
+            raw?.category || raw?.categoryId || raw?.category_id || toSlug(raw?.categoryName || raw?.category_name || '')
+        ).trim(),
+        variant: raw?.variant ? String(raw.variant).trim() : undefined,
+        image: String(raw?.image || raw?.src || raw?.url || raw?.photo || '').trim() || undefined,
+        keyBenefits: Array.isArray(raw?.keyBenefits) ? raw.keyBenefits.map((item: any) => String(item)) : undefined,
+        ingredientsUsage: raw?.ingredientsUsage ? String(raw.ingredientsUsage).trim() : undefined,
+    };
+}
+
 // Generic fetch wrapper with error handling
 async function fetchAPI<T>(endpoint: string): Promise<T> {
     try {
@@ -21,27 +56,55 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
 
 // Get all categories
 export async function getCategories(): Promise<Category[]> {
-    return fetchAPI<Category[]>('/categories');
+    const categories = await fetchAPI<any[]>('/categories');
+    return Array.isArray(categories) ? categories.map(normalizeCategory).filter((item) => item.id) : [];
 }
 
 // Get category by ID
 export async function getCategoryById(id: string): Promise<Category> {
-    return fetchAPI<Category>(`/categories/${id}`);
+    try {
+        const category = await fetchAPI<any>(`/categories/${id}`);
+        return normalizeCategory(category);
+    } catch {
+        const categories = await getCategories();
+        const matched = categories.find((item) => item.id === id || toSlug(item.name) === id);
+        if (matched) {
+            return matched;
+        }
+        throw new Error('Category not found');
+    }
 }
 
 // Get all products
 export async function getProducts(): Promise<Product[]> {
-    return fetchAPI<Product[]>('/products');
+    const products = await fetchAPI<any[]>('/products');
+    return Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
 }
 
 // Get products by category
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
-    return fetchAPI<Product[]>(`/products/category/${categoryId}`);
+    try {
+        const products = await fetchAPI<any[]>(`/products/category/${categoryId}`);
+        const normalized = Array.isArray(products)
+            ? products
+                  .map(normalizeProduct)
+                  .filter((item) => item.id && (item.category === categoryId || toSlug(item.category) === categoryId))
+            : [];
+        if (normalized.length > 0) {
+            return normalized;
+        }
+        const allProducts = await getProducts();
+        return allProducts.filter((item) => item.category === categoryId || toSlug(item.category) === categoryId);
+    } catch {
+        const products = await getProducts();
+        return products.filter((item) => item.category === categoryId || toSlug(item.category) === categoryId);
+    }
 }
 
 // Get featured products
 export async function getFeaturedProducts(): Promise<Product[]> {
-    return fetchAPI<Product[]>('/products/featured');
+    const products = await fetchAPI<any[]>('/products/featured');
+    return Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
 }
 
 // Upload products file
