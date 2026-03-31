@@ -19,6 +19,21 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+function normalizeCategoryKey(value: string): string {
+  return toSlug(value).replace(/-/g, '');
+}
+
+function getCategoryKeys(category: Category): string[] {
+  const aliases: Record<string, string[]> = {
+    airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
+    handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
+    toiletries: ['toiletry', 'personal-care', 'personalcare'],
+  };
+
+  const keys = [category.id, category.name, ...(aliases[category.id] || [])];
+  return Array.from(new Set(keys.map(normalizeCategoryKey).filter(Boolean)));
+}
+
 export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -29,10 +44,20 @@ export function HomePage() {
       try {
         const products = await api.getProducts();
         const counts = new Map<string, number>();
+        const categoryKeys = new Map<string, string[]>(
+          mainCategories.map((category) => [category.id, getCategoryKeys(category)])
+        );
 
         products.forEach((product) => {
-          const key = toSlug(product.category);
-          counts.set(key, (counts.get(key) || 0) + 1);
+          const productKey = normalizeCategoryKey(product.category || '');
+          if (!productKey) return;
+
+          const matchedCategory = mainCategories.find((category) =>
+            (categoryKeys.get(category.id) || []).includes(productKey)
+          );
+
+          if (!matchedCategory) return;
+          counts.set(matchedCategory.id, (counts.get(matchedCategory.id) || 0) + 1);
         });
 
         const nextCategories = mainCategories
