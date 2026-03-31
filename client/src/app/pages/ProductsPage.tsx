@@ -7,6 +7,48 @@ import { Category, Product } from '../../data/products';
 import * as api from '../../services/api';
 import { Package } from 'lucide-react';
 
+function toSlug(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function toCategoryName(value: string): string {
+  return String(value || 'Uncategorized')
+    .split('-')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function deriveCategoriesFromProducts(items: Product[]): Category[] {
+  const counts = new Map<string, number>();
+
+  items.forEach((product) => {
+    const categoryId = toSlug(product.category || 'uncategorized');
+    counts.set(categoryId, (counts.get(categoryId) || 0) + 1);
+  });
+
+  return Array.from(counts.entries()).map(([id, productCount]) => ({
+    id,
+    name: toCategoryName(id),
+    description: '',
+    icon: '📦',
+    productCount,
+  }));
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} request timed out`)), timeoutMs);
+    }),
+  ]);
+}
+
 export function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -17,29 +59,34 @@ export function ProductsPage() {
 
     async function fetchProducts() {
       setLoading(true);
-      const [categoriesResult, productsResult] = await Promise.allSettled([
-        api.getCategories(),
-        api.getProducts()
-      ]);
+      try {
+        let nextProducts: Product[] = [];
+        let nextCategories: Category[] = [];
 
-      if (!isMounted) {
-        return;
-      }
+        try {
+          nextProducts = await withTimeout(api.getProducts(), 12000, 'Products');
+        } catch (error) {
+          console.error('Error fetching products:', error);
+        }
 
-      if (categoriesResult.status === 'fulfilled') {
-        setCategories(categoriesResult.value);
-      } else if (categoriesResult.status === 'rejected') {
-        console.error('Error fetching categories:', categoriesResult.reason);
-      }
+        try {
+          nextCategories = await withTimeout(api.getCategories(), 12000, 'Categories');
+        } catch (error) {
+          console.error('Error fetching categories:', error);
+        }
 
-      if (productsResult.status === 'fulfilled') {
-        setProducts(productsResult.value);
-      } else if (productsResult.status === 'rejected') {
-        console.error('Error fetching products:', productsResult.reason);
-      }
+        if (!nextCategories.length && nextProducts.length) {
+          nextCategories = deriveCategoriesFromProducts(nextProducts);
+        }
 
-      if (isMounted) {
-        setLoading(false);
+        if (isMounted) {
+          setProducts(nextProducts);
+          setCategories(nextCategories);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
@@ -100,6 +147,11 @@ export function ProductsPage() {
                   </motion.div>
                 ))}
               </div>
+              {categories.length === 0 && (
+                <div className="text-center mb-16">
+                  <p className="text-muted-foreground">No categories found.</p>
+                </div>
+              )}
 
               <div className="text-center mb-12">
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
