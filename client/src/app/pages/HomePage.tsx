@@ -1,17 +1,64 @@
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CategoryCard } from '../components/CategoryCard';
 import { ImageSlider } from '../components/ImageSlider';
 import {
   Category,
   categories as mainCategories,
 } from '../../data/products';
+import * as api from '../../services/api';
 import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
+function toSlug(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export function HomePage() {
-  const [categories] = useState<Category[]>(mainCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCategoriesFromProducts() {
+      try {
+        const products = await api.getProducts();
+        const counts = new Map<string, number>();
+
+        products.forEach((product) => {
+          const key = toSlug(product.category);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        });
+
+        const nextCategories = mainCategories
+          .filter((category) => (counts.get(category.id) || 0) > 0)
+          .map((category) => ({
+            ...category,
+            productCount: counts.get(category.id) || 0,
+          }));
+
+        if (isMounted) {
+          setCategories(nextCategories);
+        }
+      } catch (error) {
+        console.error('Error loading categories from products:', error);
+        if (isMounted) {
+          setCategories([]);
+        }
+      }
+    }
+
+    loadCategoriesFromProducts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
 
   return (
@@ -50,6 +97,11 @@ export function HomePage() {
                   </motion.div>
                 ))}
               </div>
+              {categories.length === 0 && (
+                <div className="text-center mt-8">
+                  <p className="text-muted-foreground">No categories with products found.</p>
+                </div>
+              )}
             </div>
           </section>
 
