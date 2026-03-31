@@ -3,8 +3,6 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from './ui/carousel';
 
 interface SliderImage {
@@ -84,7 +82,6 @@ export function ImageSlider() {
         }
 
         if (!loaded || !isMounted || data.length === 0) {
-          setSliderImages([]);
           return;
         }
 
@@ -104,10 +101,11 @@ export function ImageSlider() {
           })
           .filter((item) => item.src);
 
-        setSliderImages(cleaned);
+        if (cleaned.length > 0) {
+          setSliderImages(cleaned);
+        }
       } catch {
         console.error('Unable to load sliders from API');
-        setSliderImages([]);
       }
     };
 
@@ -165,9 +163,7 @@ export function ImageSlider() {
             <CarouselContent className="h-full">
               {displayImages.map((image, index) => (
                 <CarouselItem key={image.id} className="h-full">
-                  <div
-                    className="relative w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
-                  >
+                  <div className="relative w-full h-full overflow-hidden cursor-grab active:cursor-grabbing">
                     <img
                       src={image.src}
                       alt={image.alt}
