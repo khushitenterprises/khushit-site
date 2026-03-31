@@ -24,6 +24,21 @@ function normalizeCategory(raw: any): Category {
 
 function normalizeProduct(raw: any): Product {
     const name = String(raw?.name || raw?.title || '').trim();
+    const imageCandidate = String(
+        raw?.image || raw?.imageUrl || raw?.image_url || raw?.src || raw?.url || raw?.photo || ''
+    ).trim();
+
+    let image: string | undefined;
+    if (imageCandidate) {
+        if (/^(https?:)?\/\//i.test(imageCandidate) || imageCandidate.startsWith('data:') || imageCandidate.startsWith('blob:')) {
+            image = imageCandidate;
+        } else if (API_URL) {
+            image = imageCandidate.startsWith('/') ? `${API_URL}${imageCandidate}` : `${API_URL}/${imageCandidate}`;
+        } else {
+            image = imageCandidate;
+        }
+    }
+
     return {
         id: String(raw?.id || raw?.productId || toSlug(name) || `product-${Date.now()}`).trim(),
         name,
@@ -32,10 +47,32 @@ function normalizeProduct(raw: any): Product {
             raw?.category || raw?.categoryId || raw?.category_id || toSlug(raw?.categoryName || raw?.category_name || '')
         ).trim(),
         variant: raw?.variant ? String(raw.variant).trim() : undefined,
-        image: String(raw?.image || raw?.src || raw?.url || raw?.photo || '').trim() || undefined,
+        image,
         keyBenefits: Array.isArray(raw?.keyBenefits) ? raw.keyBenefits.map((item: any) => String(item)) : undefined,
         ingredientsUsage: raw?.ingredientsUsage ? String(raw.ingredientsUsage).trim() : undefined,
     };
+}
+
+function normalizeCategoryKey(value: string): string {
+    return toSlug(value).replace(/-/g, '');
+}
+
+function getCategoryAliases(categoryId: string): string[] {
+    const aliases: Record<string, string[]> = {
+        airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
+        handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
+        toiletries: ['toiletry', 'personal-care', 'personalcare'],
+    };
+    return aliases[categoryId] || [];
+}
+
+function categoryMatches(requestedCategoryId: string, productCategory: string): boolean {
+    const requestedKeys = [
+        normalizeCategoryKey(requestedCategoryId),
+        ...getCategoryAliases(requestedCategoryId).map(normalizeCategoryKey),
+    ];
+    const productKey = normalizeCategoryKey(productCategory);
+    return requestedKeys.includes(productKey);
 }
 
 // Generic fetch wrapper with error handling
@@ -88,16 +125,16 @@ export async function getProductsByCategory(categoryId: string): Promise<Product
         const normalized = Array.isArray(products)
             ? products
                   .map(normalizeProduct)
-                  .filter((item) => item.id && (item.category === categoryId || toSlug(item.category) === categoryId))
+                  .filter((item) => item.id && categoryMatches(categoryId, item.category))
             : [];
         if (normalized.length > 0) {
             return normalized;
         }
         const allProducts = await getProducts();
-        return allProducts.filter((item) => item.category === categoryId || toSlug(item.category) === categoryId);
+        return allProducts.filter((item) => categoryMatches(categoryId, item.category));
     } catch {
         const products = await getProducts();
-        return products.filter((item) => item.category === categoryId || toSlug(item.category) === categoryId);
+        return products.filter((item) => categoryMatches(categoryId, item.category));
     }
 }
 
