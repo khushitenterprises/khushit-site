@@ -18,13 +18,19 @@ interface SliderImage {
 export function ImageSlider() {
   const apiBase = useMemo(() => import.meta.env.VITE_API_URL || '', []);
   const [sliderImages, setSliderImages] = useState<SliderImage[]>([]);
-  const [failedImageIds, setFailedImageIds] = useState<string[]>([]);
   const carouselApiRef = useRef<any>(null);
   const [isAutoplay, setIsAutoplay] = useState(true);
-  const displayImages = useMemo(
-    () => sliderImages.filter((image) => !failedImageIds.includes(image.id)),
-    [sliderImages, failedImageIds]
-  );
+  const displayImages = useMemo(() => sliderImages, [sliderImages]);
+  const brokenImagePlaceholder =
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="480" viewBox="0 0 1280 480">
+        <rect width="1280" height="480" fill="#f3f4f6"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#6b7280" font-size="36" font-family="Arial, sans-serif">
+          Slider image not available
+        </text>
+      </svg>`
+    );
 
   useEffect(() => {
     let isMounted = true;
@@ -58,10 +64,8 @@ export function ImageSlider() {
           .filter((item) => item.src);
 
         setSliderImages(cleaned);
-        setFailedImageIds([]);
       } catch {
         setSliderImages([]);
-        setFailedImageIds([]);
       }
     };
 
@@ -130,8 +134,12 @@ export function ImageSlider() {
                       decoding="async"
                       fetchPriority={index === 0 ? 'high' : 'auto'}
                       draggable={false}
-                      onError={(e) => {
-                        setFailedImageIds((prev) => (prev.includes(image.id) ? prev : [...prev, image.id]));
+                      onError={(event) => {
+                        const element = event.currentTarget;
+                        if (element.src === brokenImagePlaceholder) {
+                          return;
+                        }
+                        element.src = brokenImagePlaceholder;
                       }}
                     />
                   </div>
