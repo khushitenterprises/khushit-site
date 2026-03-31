@@ -39,8 +39,12 @@ export function ImageSlider() {
     if (import.meta.env.DEV && typeof window !== 'undefined') {
       const protocol = window.location.protocol || 'http:';
       const host = window.location.hostname || 'localhost';
+      candidates.add(window.location.origin);
+
       for (let port = 5000; port <= 5010; port += 1) {
         candidates.add(`${protocol}//${host}:${port}`);
+        candidates.add(`http://${host}:${port}`);
+        candidates.add(`https://${host}:${port}`);
       }
     }
 
@@ -57,7 +61,13 @@ export function ImageSlider() {
 
         for (const base of apiCandidates) {
           try {
-            const response = await fetch(`${base}/api/sliders`);
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 3500);
+            const response = await fetch(`${base}/api/sliders`, {
+              signal: controller.signal,
+            });
+            window.clearTimeout(timeoutId);
+
             if (!response.ok) {
               continue;
             }
@@ -74,6 +84,7 @@ export function ImageSlider() {
         }
 
         if (!loaded || !isMounted || data.length === 0) {
+          setSliderImages([]);
           return;
         }
 
