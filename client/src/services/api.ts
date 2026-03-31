@@ -39,13 +39,20 @@ function normalizeProduct(raw: any): Product {
         }
     }
 
+    const normalizedCategory = String(
+        raw?.category ??
+            raw?.categoryName ??
+            raw?.category_name ??
+            raw?.categoryId ??
+            raw?.category_id ??
+            ''
+    ).trim();
+
     return {
         id: String(raw?.id || raw?.productId || toSlug(name) || `product-${Date.now()}`).trim(),
         name,
         description: String(raw?.description || '').trim(),
-        category: String(
-            raw?.category || raw?.categoryId || raw?.category_id || toSlug(raw?.categoryName || raw?.category_name || '')
-        ).trim(),
+        category: normalizedCategory || 'uncategorized',
         variant: raw?.variant ? String(raw.variant).trim() : undefined,
         image,
         keyBenefits: Array.isArray(raw?.keyBenefits) ? raw.keyBenefits.map((item: any) => String(item)) : undefined,
@@ -122,11 +129,7 @@ export async function getProducts(): Promise<Product[]> {
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
     try {
         const products = await fetchAPI<any[]>(`/products/category/${categoryId}`);
-        const normalized = Array.isArray(products)
-            ? products
-                  .map(normalizeProduct)
-                  .filter((item) => item.id && categoryMatches(categoryId, item.category))
-            : [];
+        const normalized = Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
         if (normalized.length > 0) {
             return normalized;
         }
