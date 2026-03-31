@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ProductCard } from '../components/ProductCard';
-import { Product, Category } from '../../data/products';
+import { Product, Category, getCategoryById as getFallbackCategoryById } from '../../data/products';
 import * as api from '../../services/api';
 import { ChevronRight } from 'lucide-react';
 
@@ -26,7 +26,8 @@ export function CategoryDetailPage() {
           api.getProductsByCategory(categoryId)
         ]);
 
-        const nextCategory = categoryResult.status === 'fulfilled' ? categoryResult.value : null;
+        const fallbackCategory = getFallbackCategoryById(categoryId) || null;
+        const nextCategory = fallbackCategory || (categoryResult.status === 'fulfilled' ? categoryResult.value : null);
         const nextProducts = productsResult.status === 'fulfilled' ? productsResult.value : [];
 
         if (!nextCategory) {

@@ -1,38 +1,17 @@
 import { motion } from 'motion/react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { CategoryCard } from '../components/CategoryCard';
 import { ImageSlider } from '../components/ImageSlider';
 import {
   Category,
+  categories as mainCategories,
 } from '../../data/products';
-import * as api from '../../services/api';
 import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function fetchData() {
-      try {
-        const nextCategories = await api.getCategories();
-        if (isMounted) {
-          setCategories(nextCategories);
-        }
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-      }
-    }
-
-    fetchData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const [categories] = useState<Category[]>(mainCategories);
 
 
   return (
