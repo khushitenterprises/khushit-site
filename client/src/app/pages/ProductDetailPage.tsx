@@ -5,8 +5,6 @@ import { ChevronRight, CheckCircle2 } from 'lucide-react';
 import {
   Category,
   Product,
-  getCategoryById as getFallbackCategoryById,
-  getProductsByCategory as getFallbackProductsByCategory,
 } from '../../data/products';
 import * as api from '../../services/api';
 
@@ -40,12 +38,8 @@ export function ProductDetailPage() {
           api.getProductsByCategory(categoryId)
         ]);
 
-        const categoryData =
-          categoryResult.status === 'fulfilled' ? categoryResult.value : getFallbackCategoryById(categoryId) || null;
-        const productsData =
-          productsResult.status === 'fulfilled' && productsResult.value.length
-            ? productsResult.value
-            : getFallbackProductsByCategory(categoryId);
+        const categoryData = categoryResult.status === 'fulfilled' ? categoryResult.value : null;
+        const productsData = productsResult.status === 'fulfilled' ? productsResult.value : [];
 
         const matchedProduct =
           productsData.find((item) => item.id === productId) ||

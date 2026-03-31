@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { Link } from 'react-router-dom';
 import { CategoryCard } from '../components/CategoryCard';
 import { ProductCard } from '../components/ProductCard';
-import { Category, Product, categories as fallbackCategories, products as fallbackProducts } from '../../data/products';
+import { Category, Product } from '../../data/products';
 import * as api from '../../services/api';
 import { Package } from 'lucide-react';
 
 export function ProductsPage() {
-  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
-  const [products, setProducts] = useState<Product[]>(fallbackProducts);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,13 +26,13 @@ export function ProductsPage() {
         return;
       }
 
-      if (categoriesResult.status === 'fulfilled' && categoriesResult.value.length) {
+      if (categoriesResult.status === 'fulfilled') {
         setCategories(categoriesResult.value);
       } else if (categoriesResult.status === 'rejected') {
         console.error('Error fetching categories:', categoriesResult.reason);
       }
 
-      if (productsResult.status === 'fulfilled' && productsResult.value.length) {
+      if (productsResult.status === 'fulfilled') {
         setProducts(productsResult.value);
       } else if (productsResult.status === 'rejected') {
         console.error('Error fetching products:', productsResult.reason);
@@ -99,6 +100,37 @@ export function ProductsPage() {
                   </motion.div>
                 ))}
               </div>
+
+              <div className="text-center mb-12">
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+                  All <span className="text-primary">Products</span>
+                </h2>
+                <p className="text-muted-foreground max-w-2xl mx-auto">
+                  Showing products loaded from the database.
+                </p>
+              </div>
+
+              {products.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">No products found.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {products.map((product, index) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.03 }}
+                    >
+                      <Link to={`/products/${product.category}/${product.id}`}>
+                        <ProductCard product={product} />
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 

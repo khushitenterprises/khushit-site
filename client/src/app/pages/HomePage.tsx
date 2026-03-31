@@ -1,48 +1,29 @@
 import { motion } from 'motion/react';
-import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Button } from '../components/Button';
 import { CategoryCard } from '../components/CategoryCard';
-import { ProductCard } from '../components/ProductCard';
 import { ImageSlider } from '../components/ImageSlider';
 import {
   Category,
-  Product,
-  categories as fallbackCategories,
-  getFeaturedProducts as getFallbackFeaturedProducts,
 } from '../../data/products';
 import * as api from '../../services/api';
-import { Award, Shield, TrendingUp, Sparkles } from 'lucide-react';
+import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
-  const [categories, setCategories] = useState<Category[]>(fallbackCategories);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(getFallbackFeaturedProducts());
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function fetchData() {
-      const [categoriesResult, productsResult] = await Promise.allSettled([
-        api.getCategories(),
-        api.getFeaturedProducts()
-      ]);
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (categoriesResult.status === 'fulfilled' && categoriesResult.value.length) {
-        setCategories(categoriesResult.value);
-      } else if (categoriesResult.status === 'rejected') {
-        console.error('Error fetching categories:', categoriesResult.reason);
-      }
-
-      if (productsResult.status === 'fulfilled' && productsResult.value.length) {
-        setFeaturedProducts(productsResult.value);
-      } else if (productsResult.status === 'rejected') {
-        console.error('Error fetching featured products:', productsResult.reason);
+      try {
+        const nextCategories = await api.getCategories();
+        if (isMounted) {
+          setCategories(nextCategories);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
       }
     }
 
