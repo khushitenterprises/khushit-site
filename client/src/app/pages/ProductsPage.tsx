@@ -29,51 +29,66 @@ function getCategoryKeys(category: Category): string[] {
 }
 
 export function ProductsPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(mainCategories);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadCategoriesFromProducts() {
       setLoading(true);
-      setError(null);
-
       try {
-        const products = await api.getProducts();
-        const counts = new Map<string, number>();
         const categoryKeys = new Map<string, string[]>(
           mainCategories.map((category) => [category.id, getCategoryKeys(category)])
         );
+        const counts = new Map<string, number>();
 
-        products.forEach((product) => {
-          const productKey = normalizeCategoryKey(product.category || '');
-          if (!productKey) return;
+        try {
+          const products = await api.getProducts();
+          products.forEach((product) => {
+            const productKey = normalizeCategoryKey(product.category || '');
+            if (!productKey) return;
+            const matchedCategory = mainCategories.find((category) =>
+              (categoryKeys.get(category.id) || []).includes(productKey)
+            );
+            if (!matchedCategory) return;
+            counts.set(matchedCategory.id, (counts.get(matchedCategory.id) || 0) + 1);
+          });
+        } catch (productsError) {
+          console.error('Error loading categories from products:', productsError);
+        }
 
-          const matchedCategory = mainCategories.find((category) =>
-            (categoryKeys.get(category.id) || []).includes(productKey)
-          );
-
-          if (!matchedCategory) return;
-          counts.set(matchedCategory.id, (counts.get(matchedCategory.id) || 0) + 1);
-        });
+        if (counts.size === 0) {
+          try {
+            const dbCategories = await api.getCategories();
+            dbCategories.forEach((dbCategory) => {
+              const dbKeys = [
+                normalizeCategoryKey(dbCategory.id),
+                normalizeCategoryKey(dbCategory.name),
+              ].filter(Boolean);
+              const matchedCategory = mainCategories.find((category) =>
+                dbKeys.some((key) => (categoryKeys.get(category.id) || []).includes(key))
+              );
+              if (!matchedCategory) return;
+              counts.set(
+                matchedCategory.id,
+                Number(dbCategory.productCount || 0) || counts.get(matchedCategory.id) || 1
+              );
+            });
+          } catch (categoriesError) {
+            console.error('Error loading categories:', categoriesError);
+          }
+        }
 
         const nextCategories = mainCategories
           .filter((category) => (counts.get(category.id) || 0) > 0)
           .map((category) => ({
             ...category,
-            productCount: counts.get(category.id) || 0,
+            productCount: counts.get(category.id) || category.productCount,
           }));
 
         if (isMounted) {
-          setCategories(nextCategories);
-        }
-      } catch (fetchError) {
-        console.error('Error loading categories from products:', fetchError);
-        if (isMounted) {
-          setCategories([]);
-          setError('Unable to load categories from database products.');
+          setCategories(nextCategories.length > 0 ? nextCategories : mainCategories);
         }
       } finally {
         if (isMounted) {
@@ -147,17 +162,6 @@ export function ProductsPage() {
             </div>
           )}
 
-          {!loading && categories.length === 0 && !error && (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No categories with products found.</p>
-            </div>
-          )}
-
-          {error && (
-            <div className="text-center py-8">
-              <p className="text-red-600">{error}</p>
-            </div>
-          )}
         </div>
       </section>
     </div>

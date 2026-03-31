@@ -35,46 +35,63 @@ function getCategoryKeys(category: Category): string[] {
 }
 
 export function HomePage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(mainCategories);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadCategoriesFromProducts() {
+      const categoryKeys = new Map<string, string[]>(
+        mainCategories.map((category) => [category.id, getCategoryKeys(category)])
+      );
+      const counts = new Map<string, number>();
+
       try {
         const products = await api.getProducts();
-        const counts = new Map<string, number>();
-        const categoryKeys = new Map<string, string[]>(
-          mainCategories.map((category) => [category.id, getCategoryKeys(category)])
-        );
-
         products.forEach((product) => {
           const productKey = normalizeCategoryKey(product.category || '');
           if (!productKey) return;
-
           const matchedCategory = mainCategories.find((category) =>
             (categoryKeys.get(category.id) || []).includes(productKey)
           );
-
           if (!matchedCategory) return;
           counts.set(matchedCategory.id, (counts.get(matchedCategory.id) || 0) + 1);
         });
+      } catch (productsError) {
+        console.error('Error loading categories from products:', productsError);
+      }
 
-        const nextCategories = mainCategories
-          .filter((category) => (counts.get(category.id) || 0) > 0)
-          .map((category) => ({
-            ...category,
-            productCount: counts.get(category.id) || 0,
-          }));
+      if (counts.size === 0) {
+        try {
+          const dbCategories = await api.getCategories();
+          dbCategories.forEach((dbCategory) => {
+            const dbKeys = [
+              normalizeCategoryKey(dbCategory.id),
+              normalizeCategoryKey(dbCategory.name),
+            ].filter(Boolean);
+            const matchedCategory = mainCategories.find((category) =>
+              dbKeys.some((key) => (categoryKeys.get(category.id) || []).includes(key))
+            );
+            if (!matchedCategory) return;
+            counts.set(
+              matchedCategory.id,
+              Number(dbCategory.productCount || 0) || counts.get(matchedCategory.id) || 1
+            );
+          });
+        } catch (categoriesError) {
+          console.error('Error loading categories:', categoriesError);
+        }
+      }
 
-        if (isMounted) {
-          setCategories(nextCategories);
-        }
-      } catch (error) {
-        console.error('Error loading categories from products:', error);
-        if (isMounted) {
-          setCategories([]);
-        }
+      const nextCategories = mainCategories
+        .filter((category) => (counts.get(category.id) || 0) > 0)
+        .map((category) => ({
+          ...category,
+          productCount: counts.get(category.id) || category.productCount,
+        }));
+
+      if (isMounted) {
+        setCategories(nextCategories.length > 0 ? nextCategories : mainCategories);
       }
     }
 
@@ -122,11 +139,6 @@ export function HomePage() {
                   </motion.div>
                 ))}
               </div>
-              {categories.length === 0 && (
-                <div className="text-center mt-8">
-                  <p className="text-muted-foreground">No categories with products found.</p>
-                </div>
-              )}
             </div>
           </section>
 
