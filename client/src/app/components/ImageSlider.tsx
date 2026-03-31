@@ -31,19 +31,49 @@ export function ImageSlider() {
         </text>
       </svg>`
     );
+  const apiCandidates = useMemo(() => {
+    const candidates = new Set<string>();
+    candidates.add(apiBase);
+    candidates.add('');
+
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const protocol = window.location.protocol || 'http:';
+      const host = window.location.hostname || 'localhost';
+      for (let port = 5000; port <= 5010; port += 1) {
+        candidates.add(`${protocol}//${host}:${port}`);
+      }
+    }
+
+    return Array.from(candidates);
+  }, [apiBase]);
 
   useEffect(() => {
     let isMounted = true;
 
     const loadSliders = async () => {
       try {
-        const response = await fetch(`${apiBase}/api/sliders`);
-        if (!response.ok) {
-          return;
+        let data: SliderImage[] = [];
+        let loaded = false;
+
+        for (const base of apiCandidates) {
+          try {
+            const response = await fetch(`${base}/api/sliders`);
+            if (!response.ok) {
+              continue;
+            }
+
+            const nextData = (await response.json()) as SliderImage[];
+            if (Array.isArray(nextData)) {
+              data = nextData;
+              loaded = true;
+              break;
+            }
+          } catch {
+            continue;
+          }
         }
 
-        const data = (await response.json()) as SliderImage[];
-        if (!isMounted || !Array.isArray(data) || data.length === 0) {
+        if (!loaded || !isMounted || data.length === 0) {
           return;
         }
 
@@ -65,6 +95,7 @@ export function ImageSlider() {
 
         setSliderImages(cleaned);
       } catch {
+        console.error('Unable to load sliders from API');
         setSliderImages([]);
       }
     };
@@ -74,7 +105,7 @@ export function ImageSlider() {
     return () => {
       isMounted = false;
     };
-  }, [apiBase]);
+  }, [apiCandidates]);
 
   useEffect(() => {
     if (!isAutoplay || displayImages.length < 2) return;
