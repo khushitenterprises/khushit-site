@@ -2,6 +2,7 @@ import { Product, Category } from '../data/products';
 
 const envApiUrl = import.meta.env.VITE_API_URL;
 const API_URL = envApiUrl || '';
+const API_TIMEOUT_MS = 12000;
 
 function toSlug(value: string): string {
     return String(value || '')
@@ -84,8 +85,13 @@ function categoryMatches(requestedCategoryId: string, productCategory: string): 
 
 // Generic fetch wrapper with error handling
 async function fetchAPI<T>(endpoint: string): Promise<T> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
     try {
-        const response = await fetch(`${API_URL}/api${endpoint}`);
+        const response = await fetch(`${API_URL}/api${endpoint}`, {
+            signal: controller.signal
+        });
 
         if (!response.ok) {
             throw new Error(`API Error: ${response.statusText}`);
@@ -93,8 +99,14 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
 
         return await response.json();
     } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            console.error(`Request timeout for ${endpoint} after ${API_TIMEOUT_MS}ms`);
+            throw new Error('Request timed out');
+        }
         console.error(`Failed to fetch ${endpoint}:`, error);
         throw error;
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
