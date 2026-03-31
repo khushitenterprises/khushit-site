@@ -146,13 +146,20 @@ async function getProductsData() {
 
     if (categories.length === 0 || products.length === 0) {
         const dataPath = path.join(__dirname, '../data/products.json');
-        const data = JSON.parse(await fs.readFile(dataPath, 'utf-8'));
+        let data = { categories: [], products: [] };
 
-        if (categories.length === 0 && data.categories?.length) {
+        try {
+            const fileContent = await fs.readFile(dataPath, 'utf-8');
+            data = JSON.parse(fileContent);
+        } catch (error) {
+            console.warn(`Seed data file not found at ${dataPath}. Skipping seeding.`, error.message);
+        }
+
+        if (categories.length === 0 && Array.isArray(data.categories) && data.categories.length) {
             await db.collection('categories').insertMany(data.categories);
         }
 
-        if (products.length === 0 && data.products?.length) {
+        if (products.length === 0 && Array.isArray(data.products) && data.products.length) {
             await db.collection('products').insertMany(data.products);
         }
 
