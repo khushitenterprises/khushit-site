@@ -23,10 +23,40 @@ function normalizeCategory(raw: any): Category {
     };
 }
 
+function keyToComparable(value: string): string {
+    return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function pickRawField(raw: any, keys: string[]): any {
+    if (!raw || typeof raw !== 'object') {
+        return undefined;
+    }
+
+    for (const key of keys) {
+        if (raw[key] !== undefined && raw[key] !== null && String(raw[key]).trim() !== '') {
+            return raw[key];
+        }
+    }
+
+    const expectedKeys = new Set(keys.map(keyToComparable));
+    for (const [entryKey, entryValue] of Object.entries(raw)) {
+        if (!expectedKeys.has(keyToComparable(entryKey))) {
+            continue;
+        }
+
+        if (entryValue !== undefined && entryValue !== null && String(entryValue).trim() !== '') {
+            return entryValue;
+        }
+    }
+
+    return undefined;
+}
+
 function normalizeProduct(raw: any): Product {
-    const name = String(raw?.name || raw?.title || '').trim();
+    const name = String(pickRawField(raw, ['name', 'title', 'productName', 'product_name']) || '').trim();
     const imageCandidate = String(
-        raw?.image || raw?.imageUrl || raw?.image_url || raw?.src || raw?.url || raw?.photo || ''
+        pickRawField(raw, ['image', 'imageUrl', 'image_url', 'src', 'url', 'photo'])
+            || ''
     ).trim();
 
     let image: string | undefined;
@@ -41,26 +71,29 @@ function normalizeProduct(raw: any): Product {
     }
 
     const normalizedCategory = String(
-        raw?.category ??
-            raw?.catagory ??
-            raw?.cetegory ??
-            raw?.categary ??
-            raw?.categoryName ??
-            raw?.category_name ??
-            raw?.categoryId ??
-            raw?.category_id ??
-            ''
+        pickRawField(raw, [
+            'category',
+            'catagory',
+            'cetegory',
+            'categary',
+            'categoryName',
+            'category_name',
+            'categoryId',
+            'category_id',
+        ]) || ''
     ).trim();
 
     return {
-        id: String(raw?.id || raw?.productId || toSlug(name) || `product-${Date.now()}`).trim(),
+        id: String(pickRawField(raw, ['id', 'productId', 'product_id']) || toSlug(name) || `product-${Date.now()}`).trim(),
         name,
-        description: String(raw?.description || '').trim(),
+        description: String(pickRawField(raw, ['description', 'productDescription', 'product_description']) || '').trim(),
         category: normalizedCategory || 'uncategorized',
-        variant: raw?.variant ? String(raw.variant).trim() : undefined,
+        variant: pickRawField(raw, ['variant']) ? String(pickRawField(raw, ['variant'])).trim() : undefined,
         image,
         keyBenefits: Array.isArray(raw?.keyBenefits) ? raw.keyBenefits.map((item: any) => String(item)) : undefined,
-        ingredientsUsage: raw?.ingredientsUsage ? String(raw.ingredientsUsage).trim() : undefined,
+        ingredientsUsage: pickRawField(raw, ['ingredientsUsage', 'ingredients_usage'])
+            ? String(pickRawField(raw, ['ingredientsUsage', 'ingredients_usage'])).trim()
+            : undefined,
     };
 }
 
