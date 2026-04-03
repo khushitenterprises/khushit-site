@@ -193,6 +193,17 @@ export async function getProducts(): Promise<Product[]> {
 
 // Get products by category
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
+    // Prefer all-products + local matching for resilience against backend category format mismatch.
+    try {
+        const allProducts = await getProducts();
+        const matched = allProducts.filter((item) => categoryMatches(categoryId, item.category));
+        if (matched.length > 0) {
+            return matched;
+        }
+    } catch {
+        // Fall through to category endpoint attempts below.
+    }
+
     try {
         const products = await fetchAPI<any[]>(`/products/category/${categoryId}`);
         const normalized = Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
