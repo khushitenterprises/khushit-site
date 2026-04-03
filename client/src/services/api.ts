@@ -1,4 +1,4 @@
-import { Product, Category } from '../data/products';
+import { Product, Category, categories as mainCategories } from '../data/products';
 
 const envApiUrl = import.meta.env.VITE_API_URL;
 const API_URL = envApiUrl || '';
@@ -42,6 +42,9 @@ function normalizeProduct(raw: any): Product {
 
     const normalizedCategory = String(
         raw?.category ??
+            raw?.catagory ??
+            raw?.cetegory ??
+            raw?.categary ??
             raw?.categoryName ??
             raw?.category_name ??
             raw?.categoryId ??
@@ -67,18 +70,36 @@ function normalizeCategoryKey(value: string): string {
 
 function getCategoryAliases(categoryId: string): string[] {
     const aliases: Record<string, string[]> = {
+        'bath-soaps': ['bath-soap', 'bathsoap', 'bathsoaps', 'soap', 'soaps'],
+        detergents: ['detergent'],
+        'fabric-conditioner': ['fabricconditioner', 'fabric-conditioners', 'fabricconditioners', 'fabric-softener', 'fabricsoftener'],
         airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
-        handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
+        'hair-oil': ['hair-oils', 'hairoil', 'hairoils'],
+        handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid', 'hand-wash-liquid'],
+        shampoo: ['shampoos'],
         toiletries: ['toiletry', 'personal-care', 'personalcare'],
     };
     return aliases[categoryId] || [];
 }
 
+function resolveCategoryAliases(requestedCategoryId: string): string[] {
+    const requestedKey = normalizeCategoryKey(requestedCategoryId);
+    const matchedMainCategory = mainCategories.find((item) => {
+        const keys = [item.id, item.name, ...getCategoryAliases(item.id)].map(normalizeCategoryKey);
+        return keys.includes(requestedKey);
+    });
+
+    if (!matchedMainCategory) {
+        return getCategoryAliases(requestedCategoryId);
+    }
+
+    return [matchedMainCategory.id, matchedMainCategory.name, ...getCategoryAliases(matchedMainCategory.id)];
+}
+
 function categoryMatches(requestedCategoryId: string, productCategory: string): boolean {
-    const requestedKeys = [
-        normalizeCategoryKey(requestedCategoryId),
-        ...getCategoryAliases(requestedCategoryId).map(normalizeCategoryKey),
-    ];
+    const requestedKeys = Array.from(
+        new Set([requestedCategoryId, ...resolveCategoryAliases(requestedCategoryId)].map(normalizeCategoryKey))
+    );
     const productKey = normalizeCategoryKey(productCategory);
     return requestedKeys.includes(productKey);
 }
