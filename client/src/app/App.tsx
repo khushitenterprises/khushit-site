@@ -19,6 +19,7 @@ const ProductDetailPage = lazy(() =>
 );
 const RegisterPage = lazy(() => import('./pages/RegisterPage').then((module) => ({ default: module.RegisterPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then((module) => ({ default: module.AdminPage })));
+const SLIDER_STORAGE_KEYS = ['sliders', 'slider_data', 'sliderImages', 'slider_images'];
 
 function AppShell() {
   const [showRegistration, setShowRegistration] = useState(false);
@@ -26,6 +27,13 @@ function AppShell() {
   const location = useLocation();
   const suppressPopupRoutes = new Set(['/register', '/admin']);
   const shouldShowPopup = !suppressPopupRoutes.has(location.pathname);
+
+  useEffect(() => {
+    SLIDER_STORAGE_KEYS.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+  }, []);
 
   useEffect(() => {
     window.scrollTo({
@@ -50,12 +58,9 @@ function AppShell() {
       return;
     }
 
-    const timer = setTimeout(() => {
-      setShowRegistration(true);
-    }, 5000);
+    setShowRegistration(true);
 
     return () => {
-      clearTimeout(timer);
       if (reopenTimerRef.current) {
         clearTimeout(reopenTimerRef.current);
       }
@@ -88,7 +93,7 @@ function AppShell() {
       if (!isDone) {
         setShowRegistration(true);
       }
-    }, 10000);
+    }, 5 * 60 * 1000);
   };
 
   const handleOpenRegistration = () => {

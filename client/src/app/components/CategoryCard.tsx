@@ -11,7 +11,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
   const isImageIcon = typeof category.icon === 'string' && /\.(png|jpe?g|svg|webp)$/i.test(category.icon);
 
   return (
-    <Link to={`/products/${category.id}`}>
+    <Link to={`/products/${encodeURIComponent(category.id)}`}>
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         whileInView={{ opacity: 1, scale: 1 }}

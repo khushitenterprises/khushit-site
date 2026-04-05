@@ -10,6 +10,7 @@ dotenv.config();
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 5000;
 const MAX_PORT = Number(process.env.MAX_PORT) || 5010;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
 app.use(compression()); // Compress all responses for faster transfer
@@ -58,9 +59,9 @@ app.use((err, req, res, next) => {
 });
 
 const startServer = (port) => {
-    const server = app.listen(port, () => {
-        console.log(`Server running on http://localhost:${port}`);
-        console.log(`API available at http://localhost:${port}/api`);
+    const server = app.listen(port, HOST, () => {
+        console.log(`Server running on http://${HOST}:${port}`);
+        console.log(`API available at http://${HOST}:${port}/api`);
     });
 
     server.on('error', (error) => {

@@ -6,6 +6,14 @@ import { Product, Category } from '../../data/products';
 import * as api from '../../services/api';
 import { ChevronRight } from 'lucide-react';
 
+function toSlug(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function safeDecode(value: string): string {
   try {
     return decodeURIComponent(String(value || ''));
@@ -14,48 +22,68 @@ function safeDecode(value: string): string {
   }
 }
 
+function resolveDatabaseCategory(routeCategoryId: string, categories: Category[]): Category | null {
+  const aliases: Record<string, string[]> = {
+    'bath-soaps': ['bath-soap', 'bathsoap', 'bathsoaps', 'soap', 'soaps'],
+    detergents: ['detergent'],
+    'fabric-conditioner': ['fabricconditioner', 'fabric-conditioners', 'fabricconditioners', 'fabric-softener', 'fabricsoftener'],
+    airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
+    'hair-oil': ['hair-oils', 'hairoil', 'hairoils'],
+    handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
+    shampoo: ['shampoos'],
+    toiletries: ['toiletry', 'personal-care', 'personalcare'],
+  };
+  const routeKey = toSlug(routeCategoryId);
+
+  return (
+    categories.find((item) => {
+      const keys = [item.id, item.name, ...(aliases[item.id] || [])].map(toSlug);
+      return keys.includes(routeKey);
+    }) || null
+  );
+}
+
 export function CategoryDetailPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
   const decodedCategoryId = safeDecode(categoryId || '');
 
   const [category, setCategory] = useState<Category | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     async function fetchData() {
-      if (!decodedCategoryId) return;
+      if (!categoryId) return;
 
       try {
         setLoading(true);
-        const [categoryResult, productsResult] = await Promise.allSettled([
-          api.getCategoryById(decodedCategoryId),
-          api.getProductsByCategory(decodedCategoryId)
+        const [productsResult, categoriesResult] = await Promise.allSettled([
+          api.getProductsByCategory(decodedCategoryId),
+          api.getCategories(),
         ]);
+        const nextProducts = productsResult.status === 'fulfilled' ? productsResult.value : [];
+        const resolvedCategory =
+          categoriesResult.status === 'fulfilled'
+            ? resolveDatabaseCategory(decodedCategoryId, categoriesResult.value)
+            : null;
+        const nextCategory =
+          resolvedCategory ||
+          ({
+            id: decodedCategoryId,
+            name: decodedCategoryId.replace(/-/g, ' '),
+            description: '',
+            icon: '',
+            productCount: nextProducts.length,
+          } as Category);
 
-        const productsData = productsResult.status === 'fulfilled' ? productsResult.value : [];
-        console.log('[CategoryDetailPage] categoryId:', decodedCategoryId);
-        console.log('[CategoryDetailPage] products:', productsData.length, productsData);
-
-        const categoryData =
-          categoryResult.status === 'fulfilled'
-            ? categoryResult.value
-            : ({
-                id: decodedCategoryId,
-                name: decodedCategoryId.replace(/-/g, ' '),
-                description: '',
-                icon: '',
-                productCount: productsData.length,
-              } as Category);
-
-        setCategory(categoryData);
-        setProducts(productsData);
-        setFilteredProducts(productsData);
-        setError(productsResult.status === 'rejected' ? 'Failed to load category products' : null);
+        setCategory(nextCategory);
+        setFilteredProducts(nextProducts);
+        setError(null);
       } catch (err) {
-        setError('Failed to load category data');
+        setCategory(null);
+        setFilteredProducts([]);
+        setError('Failed to load products for this category');
         console.error('Error fetching category data:', err);
       } finally {
         setLoading(false);
@@ -63,7 +91,7 @@ export function CategoryDetailPage() {
     }
 
     fetchData();
-  }, [decodedCategoryId]);
+  }, [categoryId, decodedCategoryId]);
 
   // Loading state
   if (loading) {
@@ -136,12 +164,8 @@ export function CategoryDetailPage() {
               <div className="text-6xl">{category.icon}</div>
             )}
             <div>
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3">
-                {category.name}
-              </h1>
-              <p className="text-xl text-muted-foreground mb-2">
-                {category.description}
-              </p>
+              <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3">{category.name}</h1>
+              <p className="text-xl text-muted-foreground mb-2">{category.description}</p>
               <p className="text-sm text-primary font-medium">
                 {filteredProducts.length} {category.id === 'airdrops' ? 'Flavours Available' : 'Products Available'}
               </p>
@@ -151,7 +175,7 @@ export function CategoryDetailPage() {
       </section>
 
       {/* Filter Bar (UI Only) */}
-      
+
       {/* Products Grid */}
       <section className="py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -170,7 +194,7 @@ export function CategoryDetailPage() {
                     viewport={{ once: true }}
                     transition={{ delay: index * 0.05 }}
                   >
-                    <Link to={`/products/${category.id}/${product.id}`}>
+                    <Link to={`/products/${encodeURIComponent(category.id)}/${encodeURIComponent(product.id)}`}>
                       <ProductCard product={product} />
                     </Link>
                   </motion.div>
@@ -198,9 +222,7 @@ export function CategoryDetailPage() {
       {/* Related Categories */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-foreground mb-8 text-center">
-            Explore Other Categories
-          </h2>
+          <h2 className="text-3xl font-bold text-foreground mb-8 text-center">Explore Other Categories</h2>
           <div className="flex justify-center">
             <Link to="/products">
               <motion.button

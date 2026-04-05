@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { Product, categories as frontendCategories } from '../../data/products';
+import { Product, Category } from '../../data/products';
+import * as api from '../../services/api';
 import { Button } from '../components/Button';
 
 type RegistrationRecord = {
@@ -40,7 +41,7 @@ type SliderFormState = {
 const INITIAL_PRODUCT_FORM: ProductFormState = {
     name: '',
     description: '',
-    category: frontendCategories[0]?.id || '',
+    category: '',
     existingImage: '',
     keyBenefits: '',
     ingredientsUsage: ''
@@ -90,8 +91,10 @@ export function AdminPage() {
     const [registrationsError, setRegistrationsError] = useState('');
 
     const [products, setProducts] = useState<Product[]>([]);
+    const [productCategories, setProductCategories] = useState<Category[]>([]);
     const [isLoadingProducts, setIsLoadingProducts] = useState(false);
     const [productsError, setProductsError] = useState('');
+    const [categoriesError, setCategoriesError] = useState('');
     const [productSuccess, setProductSuccess] = useState('');
 
     const [productForm, setProductForm] = useState<ProductFormState>(INITIAL_PRODUCT_FORM);
@@ -121,7 +124,10 @@ export function AdminPage() {
     }, [email, password]);
 
     const resetProductForm = () => {
-        setProductForm(INITIAL_PRODUCT_FORM);
+        setProductForm({
+            ...INITIAL_PRODUCT_FORM,
+            category: productCategories[0]?.id || ''
+        });
         setImageFile(null);
         setImagePreviewUrl('');
         setEditingProductId('');
@@ -192,6 +198,22 @@ export function AdminPage() {
         }
     }, [apiBase, authHeader]);
 
+    const loadProductCategories = useCallback(async () => {
+        try {
+            const categories = await api.getCategories();
+            setProductCategories(categories);
+            setCategoriesError('');
+            setProductForm((prev) => ({
+                ...prev,
+                category: prev.category || categories[0]?.id || ''
+            }));
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unable to load categories';
+            setCategoriesError(message);
+            setProductCategories([]);
+        }
+    }, []);
+
     const loadSliders = useCallback(async () => {
         if (!authHeader) {
             return;
@@ -255,7 +277,9 @@ export function AdminPage() {
         setPassword('');
         setRegistrations([]);
         setProducts([]);
+        setProductCategories([]);
         setProductsError('');
+        setCategoriesError('');
         setProductSuccess('');
         resetProductForm();
         setSliders([]);
@@ -646,8 +670,9 @@ export function AdminPage() {
 
         loadRegistrations();
         loadProducts();
+        loadProductCategories();
         loadSliders();
-    }, [isAuthenticated, loadRegistrations, loadProducts, loadSliders]);
+    }, [isAuthenticated, loadRegistrations, loadProducts, loadProductCategories, loadSliders]);
 
     useEffect(() => {
         if (imageFile) {
@@ -776,7 +801,7 @@ export function AdminPage() {
                                     <option value="" disabled>
                                         Select category
                                     </option>
-                                    {frontendCategories.map((category) => (
+                                    {productCategories.map((category) => (
                                         <option key={category.id} value={category.id}>
                                             {category.name}
                                         </option>
@@ -873,6 +898,7 @@ export function AdminPage() {
                     </form>
 
                     {productsError && <p className="text-sm text-red-600 mb-4">{productsError}</p>}
+                    {categoriesError && <p className="text-sm text-red-600 mb-4">{categoriesError}</p>}
                     {productSuccess && <p className="text-sm text-green-600 mb-4">{productSuccess}</p>}
 
                     <div className="overflow-x-auto -mx-4 sm:mx-0">

@@ -1,9 +1,8 @@
 import { Product, Category, categories as mainCategories } from '../data/products';
 
 const envApiUrl = import.meta.env.VITE_API_URL;
-const API_URL = String(envApiUrl || '').trim().replace(/\/+$/, '');
+const API_URL = envApiUrl || '';
 const API_TIMEOUT_MS = 12000;
-const API_BASE_CANDIDATES = Array.from(new Set([API_URL, '']));
 
 function toSlug(value: string): string {
     return String(value || '')
@@ -19,6 +18,17 @@ function safeDecode(value: string): string {
     } catch {
         return String(value || '');
     }
+}
+
+function normalizeCategory(raw: any): Category {
+    const id = String(raw?.id || raw?.categoryId || toSlug(raw?.name || '')).trim();
+    return {
+        id,
+        name: String(raw?.name || id || 'Category').trim(),
+        description: String(raw?.description || '').trim(),
+        icon: String(raw?.icon || '').trim(),
+        productCount: Number(raw?.productCount || 0),
+    };
 }
 
 function keyToComparable(value: string): string {
@@ -50,21 +60,11 @@ function pickRawField(raw: any, keys: string[]): any {
     return undefined;
 }
 
-function normalizeCategory(raw: any): Category {
-    const id = String(raw?.id || raw?.categoryId || toSlug(raw?.name || '')).trim();
-    return {
-        id,
-        name: String(raw?.name || id || 'Category').trim(),
-        description: String(raw?.description || '').trim(),
-        icon: String(raw?.icon || '').trim(),
-        productCount: Number(raw?.productCount || 0),
-    };
-}
-
 function normalizeProduct(raw: any): Product {
     const name = String(pickRawField(raw, ['name', 'title', 'productName', 'product_name']) || '').trim();
     const imageCandidate = String(
-        pickRawField(raw, ['image', 'imageUrl', 'image_url', 'src', 'url', 'photo']) || ''
+        pickRawField(raw, ['image', 'imageUrl', 'image_url', 'src', 'url', 'photo'])
+            || ''
     ).trim();
 
     let image: string | undefined;
@@ -90,7 +90,6 @@ function normalizeProduct(raw: any): Product {
             'category_id',
         ]) || ''
     ).trim();
-
     const normalizedPrice = String(
         pickRawField(raw, ['price', 'mrp', 'rate', 'amount', 'sellingPrice', 'selling_price']) || ''
     ).trim();
@@ -150,59 +149,47 @@ function categoryMatches(requestedCategoryId: string, productCategory: string): 
     return requestedKeys.includes(productKey);
 }
 
+// Generic fetch wrapper with error handling
 async function fetchAPI<T>(endpoint: string): Promise<T> {
-    const errors: string[] = [];
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-    for (const base of API_BASE_CANDIDATES) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-        const url = `${base ? `${base}` : ''}/api${endpoint}`;
+    try {
+        const response = await fetch(`${API_URL}/api${endpoint}`, {
+            signal: controller.signal
+        });
 
-        try {
-            const response = await fetch(url, {
-                signal: controller.signal,
-            });
-
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            const reason =
-                error instanceof DOMException && error.name === 'AbortError'
-                    ? `timeout after ${API_TIMEOUT_MS}ms`
-                    : error instanceof Error
-                      ? error.message
-                      : 'unknown error';
-            errors.push(`${url} -> ${reason}`);
-        } finally {
-            clearTimeout(timeout);
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.statusText}`);
         }
-    }
 
-    console.error(`Failed to fetch ${endpoint} using all API bases:`, errors);
-    throw new Error(`Failed to fetch ${endpoint}`);
+        return await response.json();
+    } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            console.error(`Request timeout for ${endpoint} after ${API_TIMEOUT_MS}ms`);
+            throw new Error('Request timed out');
+        }
+        console.error(`Failed to fetch ${endpoint}:`, error);
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
 }
 
+// Get all categories
 export async function getCategories(): Promise<Category[]> {
     const categories = await fetchAPI<any[]>('/categories');
-    const normalized = Array.isArray(categories) ? categories.map(normalizeCategory).filter((item) => item.id) : [];
-    console.log('[API] categories response:', normalized.length, normalized);
-    return normalized;
+    return Array.isArray(categories) ? categories.map(normalizeCategory).filter((item) => item.id) : [];
 }
 
+// Get category by ID
 export async function getCategoryById(id: string): Promise<Category> {
     try {
-        const category = await fetchAPI<any>(`/categories/${encodeURIComponent(id)}`);
+        const category = await fetchAPI<any>(`/categories/${id}`);
         return normalizeCategory(category);
     } catch {
         const categories = await getCategories();
-        const targetKey = normalizeCategoryKey(id);
-        const matched = categories.find((item) => {
-            const keys = [item.id, item.name, ...getCategoryAliases(item.id)].map(normalizeCategoryKey);
-            return keys.includes(targetKey);
-        });
+        const matched = categories.find((item) => item.id === id || toSlug(item.name) === id);
         if (matched) {
             return matched;
         }
@@ -210,59 +197,62 @@ export async function getCategoryById(id: string): Promise<Category> {
     }
 }
 
+// Get all products
 export async function getProducts(): Promise<Product[]> {
     const products = await fetchAPI<any[]>('/products');
-    const normalized = Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
-    console.log('[API] products response:', normalized.length, normalized);
-    return normalized;
+    return Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
 }
 
+// Get products by category
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
     const normalizedCategoryId = safeDecode(categoryId);
 
+    // Prefer all-products + local matching for resilience against backend category format mismatch.
     try {
         const allProducts = await getProducts();
         const matched = allProducts.filter((item) => categoryMatches(normalizedCategoryId, item.category));
         if (matched.length > 0) {
-            console.log('[API] products by category (from all products):', normalizedCategoryId, matched.length);
             return matched;
         }
     } catch {
-        // continue
+        // Fall through to category endpoint attempts below.
     }
 
     try {
         const products = await fetchAPI<any[]>(`/products/category/${encodeURIComponent(normalizedCategoryId)}`);
         const normalized = Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
-        const matchedFromEndpoint = normalized.filter((item) => categoryMatches(normalizedCategoryId, item.category));
-        console.log('[API] products by category (endpoint):', normalizedCategoryId, matchedFromEndpoint.length);
-        return matchedFromEndpoint;
+        const matchedFromCategoryEndpoint = normalized.filter((item) =>
+            categoryMatches(normalizedCategoryId, item.category)
+        );
+        return matchedFromCategoryEndpoint;
     } catch {
-        return [];
-    }
-}
-
-export async function getFeaturedProducts(): Promise<Product[]> {
-    try {
-        const products = await fetchAPI<any[]>('/products/featured');
-        const normalized = Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
-        if (normalized.length > 0) {
-            console.log('[API] featured products response:', normalized.length, normalized);
-            return normalized;
+        try {
+            const products = await getProducts();
+            const matched = products.filter((item) => categoryMatches(normalizedCategoryId, item.category));
+            return matched;
+        } catch {
+            return [];
         }
-    } catch {
-        // fallback below
     }
-
-    const allProducts = await getProducts();
-    const fallback = allProducts.slice(0, 8);
-    console.log('[API] featured fallback to first products:', fallback.length, fallback);
-    return fallback;
 }
 
+// Get featured products
+export async function getFeaturedProducts(): Promise<Product[]> {
+    const products = await fetchAPI<any[]>('/products/featured');
+    return Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
+}
+
+// Upload products file
 export async function uploadProductsFile(file: File): Promise<Product[]> {
     const formData = new FormData();
     formData.append('file', file);
+
+    // We can't use the generic fetchAPI easily because it assumes JSON body or no body for GET
+    // But fetchAPI is just a wrapper around fetch.
+    // wait, fetchAPI does not set Content-Type: application/json automatically?
+    // Let's check fetchAPI implementation in api.ts again.
+    // It just does fetch(`${API_URL}/api${endpoint}`). It doesn't set headers or anything.
+    // So for POST we need to handle it.
 
     const response = await fetch(`${API_URL}/api/upload-products`, {
         method: 'POST',
@@ -273,6 +263,5 @@ export async function uploadProductsFile(file: File): Promise<Product[]> {
         throw new Error(`API Error: ${response.statusText}`);
     }
 
-    const products = await response.json();
-    return Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
+    return await response.json();
 }

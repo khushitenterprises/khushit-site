@@ -1,84 +1,51 @@
 import { motion } from 'motion/react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { Button } from '../components/Button';
-import { CategoryCard } from '../components/CategoryCard';
 import { ProductCard } from '../components/ProductCard';
 import { ImageSlider } from '../components/ImageSlider';
-import {
-  Category,
-  Product,
-  categories as fallbackCategories,
-  getFeaturedProducts as getFallbackFeaturedProducts,
-} from '../../data/products';
+import { Product } from '../../data/products';
 import * as api from '../../services/api';
-import { Award, Shield, TrendingUp, Sparkles } from 'lucide-react';
+import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    async function fetchData() {
+    let isMounted = true;
+
+    async function loadFromDatabase() {
       try {
-        setLoading(true);
-        const [categoriesResult, productsResult] = await Promise.allSettled([
-          api.getCategories(),
-          api.getFeaturedProducts()
-        ]);
-
-        const categoriesData = categoriesResult.status === 'fulfilled' ? categoriesResult.value : [];
-        const productsData = productsResult.status === 'fulfilled' ? productsResult.value : [];
-
-        console.log('[HomePage] categories:', categoriesData.length, categoriesData);
-        console.log('[HomePage] featuredProducts:', productsData.length, productsData);
-
-        setCategories(categoriesData);
-        setFeaturedProducts(productsData);
-
-        if (categoriesResult.status === 'rejected' && productsResult.status === 'rejected') {
-          // Do not block the homepage when backend is temporarily unavailable.
-          setCategories(fallbackCategories);
-          setFeaturedProducts(getFallbackFeaturedProducts());
-        } else {
-          // no-op
+        const productsResult = await api.getProducts();
+        if (!isMounted) {
+          return;
         }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setCategories(fallbackCategories);
-        setFeaturedProducts(getFallbackFeaturedProducts());
-      } finally {
-        setLoading(false);
+        setProducts(productsResult);
+      } catch (error) {
+        console.error('Error loading products from database:', error);
+        if (isMounted) {
+          setProducts([]);
+        }
       }
     }
 
-    fetchData();
+    loadFromDatabase();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
 
   return (
     <div className="min-h-screen">
-      {/* Loading State */}
-      {loading && (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading products...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      {!loading && (
-        <>
+      <>
           {/* Image Slider Section */}
           <ImageSlider />
 
-          {/* Product Categories Section */}
-          <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+          {/* Products Section */}
+          <section className="py-20 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -87,26 +54,34 @@ export function HomePage() {
                 className="text-center mb-16"
               >
                 <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-                  Our Product Categories
+                  Our Products
                 </h2>
                 <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  Explore our comprehensive range of quality products across multiple categories
+                  Products loaded from database
                 </p>
               </motion.div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {categories.map((category, index) => (
-                  <motion.div
-                    key={category.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <CategoryCard category={category} />
-                  </motion.div>
-                ))}
-              </div>
+              {products.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">No products found.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {products.map((product, index) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.04 }}
+                    >
+                      <Link to={`/products/${encodeURIComponent(product.category)}/${encodeURIComponent(product.id)}`}>
+                        <ProductCard product={product} />
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
@@ -221,8 +196,7 @@ export function HomePage() {
           </motion.div>
         </div>
       </section> */}
-        </>
-      )}
+      </>
     </div>
   );
 }
