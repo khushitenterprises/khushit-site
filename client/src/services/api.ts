@@ -12,14 +12,6 @@ function toSlug(value: string): string {
         .replace(/^-+|-+$/g, '');
 }
 
-function safeDecode(value: string): string {
-    try {
-        return decodeURIComponent(String(value || ''));
-    } catch {
-        return String(value || '');
-    }
-}
-
 function normalizeCategory(raw: any): Category {
     const id = String(raw?.id || raw?.categoryId || toSlug(raw?.name || '')).trim();
     return {
@@ -90,16 +82,12 @@ function normalizeProduct(raw: any): Product {
             'category_id',
         ]) || ''
     ).trim();
-    const normalizedPrice = String(
-        pickRawField(raw, ['price', 'mrp', 'rate', 'amount', 'sellingPrice', 'selling_price']) || ''
-    ).trim();
 
     return {
         id: String(pickRawField(raw, ['id', 'productId', 'product_id']) || toSlug(name) || `product-${Date.now()}`).trim(),
         name,
         description: String(pickRawField(raw, ['description', 'productDescription', 'product_description']) || '').trim(),
         category: normalizedCategory || 'uncategorized',
-        price: normalizedPrice || undefined,
         variant: pickRawField(raw, ['variant']) ? String(pickRawField(raw, ['variant'])).trim() : undefined,
         image,
         keyBenefits: Array.isArray(raw?.keyBenefits) ? raw.keyBenefits.map((item: any) => String(item)) : undefined,
@@ -110,7 +98,7 @@ function normalizeProduct(raw: any): Product {
 }
 
 function normalizeCategoryKey(value: string): string {
-    return toSlug(safeDecode(value)).replace(/-/g, '');
+    return toSlug(value).replace(/-/g, '');
 }
 
 function getCategoryAliases(categoryId: string): string[] {
@@ -205,12 +193,10 @@ export async function getProducts(): Promise<Product[]> {
 
 // Get products by category
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
-    const normalizedCategoryId = safeDecode(categoryId);
-
     // Prefer all-products + local matching for resilience against backend category format mismatch.
     try {
         const allProducts = await getProducts();
-        const matched = allProducts.filter((item) => categoryMatches(normalizedCategoryId, item.category));
+        const matched = allProducts.filter((item) => categoryMatches(categoryId, item.category));
         if (matched.length > 0) {
             return matched;
         }
@@ -219,20 +205,16 @@ export async function getProductsByCategory(categoryId: string): Promise<Product
     }
 
     try {
-        const products = await fetchAPI<any[]>(`/products/category/${encodeURIComponent(normalizedCategoryId)}`);
+        const products = await fetchAPI<any[]>(`/products/category/${categoryId}`);
         const normalized = Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
-        const matchedFromCategoryEndpoint = normalized.filter((item) =>
-            categoryMatches(normalizedCategoryId, item.category)
-        );
-        return matchedFromCategoryEndpoint;
-    } catch {
-        try {
-            const products = await getProducts();
-            const matched = products.filter((item) => categoryMatches(normalizedCategoryId, item.category));
-            return matched;
-        } catch {
-            return [];
+        if (normalized.length > 0) {
+            return normalized;
         }
+        const allProducts = await getProducts();
+        return allProducts.filter((item) => categoryMatches(categoryId, item.category));
+    } catch {
+        const products = await getProducts();
+        return products.filter((item) => categoryMatches(categoryId, item.category));
     }
 }
 

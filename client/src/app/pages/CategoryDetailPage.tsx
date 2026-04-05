@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ProductCard } from '../components/ProductCard';
-import { Product, Category } from '../../data/products';
+import { Product, Category, categories as mainCategories } from '../../data/products';
 import * as api from '../../services/api';
 import { ChevronRight } from 'lucide-react';
 
@@ -14,29 +14,16 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(String(value || ''));
-  } catch {
-    return String(value || '');
-  }
-}
-
-function resolveDatabaseCategory(routeCategoryId: string, categories: Category[]): Category | null {
+function resolveMainCategory(routeCategoryId: string): Category | null {
   const aliases: Record<string, string[]> = {
-    'bath-soaps': ['bath-soap', 'bathsoap', 'bathsoaps', 'soap', 'soaps'],
-    detergents: ['detergent'],
-    'fabric-conditioner': ['fabricconditioner', 'fabric-conditioners', 'fabricconditioners', 'fabric-softener', 'fabricsoftener'],
     airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
-    'hair-oil': ['hair-oils', 'hairoil', 'hairoils'],
     handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
-    shampoo: ['shampoos'],
     toiletries: ['toiletry', 'personal-care', 'personalcare'],
   };
   const routeKey = toSlug(routeCategoryId);
 
   return (
-    categories.find((item) => {
+    mainCategories.find((item) => {
       const keys = [item.id, item.name, ...(aliases[item.id] || [])].map(toSlug);
       return keys.includes(routeKey);
     }) || null
@@ -45,9 +32,9 @@ function resolveDatabaseCategory(routeCategoryId: string, categories: Category[]
 
 export function CategoryDetailPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
-  const decodedCategoryId = safeDecode(categoryId || '');
 
   const [category, setCategory] = useState<Category | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -58,31 +45,26 @@ export function CategoryDetailPage() {
 
       try {
         setLoading(true);
-        const [productsResult, categoriesResult] = await Promise.allSettled([
-          api.getProductsByCategory(decodedCategoryId),
-          api.getCategories(),
-        ]);
-        const nextProducts = productsResult.status === 'fulfilled' ? productsResult.value : [];
-        const resolvedCategory =
-          categoriesResult.status === 'fulfilled'
-            ? resolveDatabaseCategory(decodedCategoryId, categoriesResult.value)
-            : null;
+        const fallbackCategory = resolveMainCategory(categoryId);
+        const resolvedCategoryId = fallbackCategory?.id || categoryId;
+
+        const productsResult = await Promise.allSettled([api.getProductsByCategory(resolvedCategoryId)]);
+        const nextProducts = productsResult[0].status === 'fulfilled' ? productsResult[0].value : [];
         const nextCategory =
-          resolvedCategory ||
+          fallbackCategory ||
           ({
-            id: decodedCategoryId,
-            name: decodedCategoryId.replace(/-/g, ' '),
+            id: resolvedCategoryId,
+            name: resolvedCategoryId.replace(/-/g, ' '),
             description: '',
-            icon: '',
-            productCount: nextProducts.length,
+            icon: '📦',
+            productCount: nextProducts.length
           } as Category);
 
         setCategory(nextCategory);
+        setProducts(nextProducts);
         setFilteredProducts(nextProducts);
         setError(null);
       } catch (err) {
-        setCategory(null);
-        setFilteredProducts([]);
         setError('Failed to load products for this category');
         console.error('Error fetching category data:', err);
       } finally {
@@ -91,7 +73,7 @@ export function CategoryDetailPage() {
     }
 
     fetchData();
-  }, [categoryId, decodedCategoryId]);
+  }, [categoryId]);
 
   // Loading state
   if (loading) {
@@ -164,8 +146,12 @@ export function CategoryDetailPage() {
               <div className="text-6xl">{category.icon}</div>
             )}
             <div>
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3">{category.name}</h1>
-              <p className="text-xl text-muted-foreground mb-2">{category.description}</p>
+              <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3">
+                {category.name}
+              </h1>
+              <p className="text-xl text-muted-foreground mb-2">
+                {category.description}
+              </p>
               <p className="text-sm text-primary font-medium">
                 {filteredProducts.length} {category.id === 'airdrops' ? 'Flavours Available' : 'Products Available'}
               </p>
@@ -175,7 +161,7 @@ export function CategoryDetailPage() {
       </section>
 
       {/* Filter Bar (UI Only) */}
-
+      
       {/* Products Grid */}
       <section className="py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -194,7 +180,7 @@ export function CategoryDetailPage() {
                     viewport={{ once: true }}
                     transition={{ delay: index * 0.05 }}
                   >
-                    <Link to={`/products/${encodeURIComponent(category.id)}/${encodeURIComponent(product.id)}`}>
+                    <Link to={`/products/${category.id}/${product.id}`}>
                       <ProductCard product={product} />
                     </Link>
                   </motion.div>
@@ -222,7 +208,9 @@ export function CategoryDetailPage() {
       {/* Related Categories */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-50">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-foreground mb-8 text-center">Explore Other Categories</h2>
+          <h2 className="text-3xl font-bold text-foreground mb-8 text-center">
+            Explore Other Categories
+          </h2>
           <div className="flex justify-center">
             <Link to="/products">
               <motion.button

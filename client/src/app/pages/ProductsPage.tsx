@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Package } from 'lucide-react';
-import { Category, categories as mainCategories } from '../../data/products';
 import { CategoryCard } from '../components/CategoryCard';
+import { Category, categories as mainCategories } from '../../data/products';
 import * as api from '../../services/api';
+import { Package } from 'lucide-react';
 
 function toSlug(value: string): string {
   return String(value || '')
@@ -35,7 +35,7 @@ export function ProductsPage() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadCategories() {
+    async function loadCategoriesFromProducts() {
       setLoading(true);
       try {
         const categoryKeys = new Map<string, string[]>(
@@ -72,7 +72,7 @@ export function ProductsPage() {
               if (!matchedCategory) return;
               counts.set(
                 matchedCategory.id,
-                Number(dbCategory.productCount || 0) || counts.get(matchedCategory.id) || 0
+                Number(dbCategory.productCount || 0) || counts.get(matchedCategory.id) || 1
               );
             });
           } catch (categoriesError) {
@@ -80,18 +80,15 @@ export function ProductsPage() {
           }
         }
 
-        const nextCategories = mainCategories.map((category) => ({
-          ...category,
-          productCount: counts.get(category.id) ?? category.productCount,
-        }));
+        const nextCategories = mainCategories
+          .filter((category) => (counts.get(category.id) || 0) > 0)
+          .map((category) => ({
+            ...category,
+            productCount: counts.get(category.id) || category.productCount,
+          }));
 
         if (isMounted) {
-          setCategories(nextCategories);
-        }
-      } catch (error) {
-        console.error('Error loading categories:', error);
-        if (isMounted) {
-          setCategories(mainCategories);
+          setCategories(nextCategories.length > 0 ? nextCategories : mainCategories);
         }
       } finally {
         if (isMounted) {
@@ -100,7 +97,7 @@ export function ProductsPage() {
       }
     }
 
-    loadCategories();
+    loadCategoriesFromProducts();
 
     return () => {
       isMounted = false;
@@ -149,10 +146,6 @@ export function ProductsPage() {
                 <p className="text-muted-foreground">Loading categories...</p>
               </div>
             </div>
-          ) : categories.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-muted-foreground">No categories found in database.</p>
-            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-16">
               {categories.map((category, index) => (
@@ -168,6 +161,7 @@ export function ProductsPage() {
               ))}
             </div>
           )}
+
         </div>
       </section>
     </div>
