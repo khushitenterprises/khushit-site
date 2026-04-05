@@ -15,11 +15,39 @@ interface SliderImage {
   link?: string;
 }
 
-const fallbackSliderImages: SliderImage[] = [];
+const codeSliderImages: SliderImage[] = [
+  {
+    id: 'sld_airdrop',
+    src: '/airdrop-banner.jpg',
+    alt: 'Airdrops banner',
+    title: 'Airdrops',
+    link: '/products/airdrops',
+  },
+  {
+    id: 'sld_beauti',
+    src: '/beauti-soap-banner.jpg',
+    alt: 'Beauti soap banner',
+    title: 'Beauti Soap',
+    link: '/products/bath-soaps',
+  },
+  {
+    id: 'sld_fabric',
+    src: '/fabric-conditioner-banner.jpg',
+    alt: 'Fabric conditioner banner',
+    title: 'Fabric Conditioner',
+    link: '/products/fabric-conditioner',
+  },
+  {
+    id: 'sld_shampoo',
+    src: '/khushit-shampoo-banner.jpg',
+    alt: 'Khushit shampoo banner',
+    title: 'Khushit Shampoo',
+    link: '/products/shampoo',
+  },
+];
 
 export function ImageSlider() {
-  const apiBase = useMemo(() => import.meta.env.VITE_API_URL || '', []);
-  const [sliderImages, setSliderImages] = useState<SliderImage[]>(fallbackSliderImages);
+  const [sliderImages] = useState<SliderImage[]>(codeSliderImages);
   const [failedImageIds, setFailedImageIds] = useState<string[]>([]);
   const [current, setCurrent] = useState(0);
   const carouselApiRef = useRef<any>(null);
@@ -28,48 +56,6 @@ export function ImageSlider() {
     () => sliderImages.filter((image) => !failedImageIds.includes(image.id)),
     [sliderImages, failedImageIds]
   );
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadSliders = async () => {
-      try {
-        const response = await fetch(`${apiBase}/api/sliders`);
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as SliderImage[];
-        if (!isMounted || !Array.isArray(data) || data.length === 0) {
-          return;
-        }
-
-        const cleaned = data
-          .filter((item) => item && item.id && String(item.src || '').trim() && item.title)
-          .map((item) => ({
-            id: String(item.id),
-            src: String(item.src).trim().replace('/allairdrop.jpeg', '/allairdrops.jpeg'),
-            alt: String(item.alt || item.title),
-            title: String(item.title),
-            link: item.link ? String(item.link) : '',
-          }));
-
-        if (cleaned.length) {
-          setSliderImages(cleaned);
-          setFailedImageIds([]);
-          setCurrent(0);
-        }
-      } catch {
-        // Keep fallback slider images when API is unavailable.
-      }
-    };
-
-    loadSliders();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [apiBase]);
 
   useEffect(() => {
     if (!isAutoplay) return;

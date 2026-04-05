@@ -23,6 +23,7 @@ const upload = multer({
 let cachedData = null;
 let cachedSliders = null;
 const productImageCache = new Map();
+let indexesReadyPromise = null;
 
 const defaultSliders = [
     {
@@ -174,6 +175,17 @@ async function getProductsData() {
     }
 
     const db = await getDb();
+    if (!indexesReadyPromise) {
+        indexesReadyPromise = Promise.all([
+            db.collection('products').createIndex({ id: 1 }, { background: true }),
+            db.collection('products').createIndex({ category: 1 }, { background: true }),
+            db.collection('categories').createIndex({ id: 1 }, { background: true })
+        ]).catch((error) => {
+            indexesReadyPromise = null;
+            console.warn('Failed to ensure Mongo indexes:', error?.message || error);
+        });
+    }
+    await indexesReadyPromise;
     const categories = await db.collection('categories').find({}).maxTimeMS(10000).toArray();
     const products = await db
         .collection('products')
@@ -630,13 +642,17 @@ router.get('/products/:id/image', async (req, res) => {
             for (let attempt = 0; attempt < 3; attempt += 1) {
                 try {
                     const db = await getDb();
+                    if (indexesReadyPromise) {
+                        await indexesReadyPromise;
+                    }
                     const doc = await db.collection('products').findOne(
                         { id: productId },
                         {
                             projection: {
                                 _id: 0,
                                 image: 1
-                            }
+                            },
+                            maxTimeMS: 15000
                         }
                     );
                     imageValue = String(doc?.image || '').trim();

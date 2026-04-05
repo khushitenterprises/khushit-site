@@ -1,7 +1,7 @@
 import { Product, Category } from '../data/products';
 
 const envApiUrl = import.meta.env.VITE_API_URL;
-const API_URL = envApiUrl || '';
+const API_URL = (envApiUrl || '').replace(/\/+$/, '');
 
 function withApiBaseIfRelative(url: string | undefined): string | undefined {
     const value = String(url || '').trim();
