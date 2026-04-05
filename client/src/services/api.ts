@@ -3,6 +3,30 @@ import { Product, Category } from '../data/products';
 const envApiUrl = import.meta.env.VITE_API_URL;
 const API_URL = envApiUrl || '';
 
+function withApiBaseIfRelative(url: string | undefined): string | undefined {
+    const value = String(url || '').trim();
+    if (!value) {
+        return undefined;
+    }
+
+    if (/^(https?:)?\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+        return value;
+    }
+
+    if (!API_URL) {
+        return value;
+    }
+
+    return value.startsWith('/') ? `${API_URL}${value}` : `${API_URL}/${value}`;
+}
+
+function normalizeProduct(product: Product): Product {
+    return {
+        ...product,
+        image: withApiBaseIfRelative(product.image)
+    };
+}
+
 // Generic fetch wrapper with error handling
 async function fetchAPI<T>(endpoint: string): Promise<T> {
     try {
@@ -31,17 +55,20 @@ export async function getCategoryById(id: string): Promise<Category> {
 
 // Get all products
 export async function getProducts(): Promise<Product[]> {
-    return fetchAPI<Product[]>('/products');
+    const products = await fetchAPI<Product[]>('/products');
+    return Array.isArray(products) ? products.map(normalizeProduct) : [];
 }
 
 // Get products by category
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
-    return fetchAPI<Product[]>(`/products/category/${categoryId}`);
+    const products = await fetchAPI<Product[]>(`/products/category/${categoryId}`);
+    return Array.isArray(products) ? products.map(normalizeProduct) : [];
 }
 
 // Get featured products
 export async function getFeaturedProducts(): Promise<Product[]> {
-    return fetchAPI<Product[]>('/products/featured');
+    const products = await fetchAPI<Product[]>('/products/featured');
+    return Array.isArray(products) ? products.map(normalizeProduct) : [];
 }
 
 // Upload products file

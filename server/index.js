@@ -11,6 +11,14 @@ const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 5000;
 const MAX_PORT = Number(process.env.MAX_PORT) || 5010;
 
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
+
 // Middleware
 app.use(compression()); // Compress all responses for faster transfer
 app.use(cors());

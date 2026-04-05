@@ -173,12 +173,37 @@ async function getProductsData() {
     }
 
     const db = await getDb();
-    const categories = await db.collection('categories').find({}).toArray();
-    const products = await db.collection('products').find({}).toArray();
+    const categories = await db.collection('categories').find({}).maxTimeMS(10000).toArray();
+    const products = await db
+        .collection('products')
+        .find(
+            {},
+            {
+                projection: {
+                    _id: 0,
+                    id: 1,
+                    name: 1,
+                    description: 1,
+                    category: 1,
+                    price: 1,
+                    variant: 1,
+                    keyBenefits: 1,
+                    ingredientsUsage: 1
+                }
+            }
+        )
+        .maxTimeMS(10000)
+        .toArray();
 
     if (categories.length === 0 || products.length === 0) {
         const dataPath = path.join(__dirname, '../data/products.json');
-        const data = JSON.parse(await fs.readFile(dataPath, 'utf-8'));
+        let data = { categories: [], products: [] };
+        try {
+            const fileContent = await fs.readFile(dataPath, 'utf-8');
+            data = JSON.parse(fileContent);
+        } catch (error) {
+            console.warn(`Seed file missing or invalid at ${dataPath}.`, error?.message || error);
+        }
 
         if (categories.length === 0 && data.categories?.length) {
             await db.collection('categories').insertMany(data.categories);
@@ -192,12 +217,18 @@ async function getProductsData() {
         const seededProducts = await db.collection('products').find({}).toArray();
         cachedData = {
             categories: seededCategories.map(({ _id, ...rest }) => rest),
-            products: seededProducts.map(({ _id, ...rest }) => rest)
+            products: seededProducts.map(({ _id, image, ...rest }) => ({
+                ...rest,
+                image: rest.id ? `/api/products/${encodeURIComponent(rest.id)}/image` : ''
+            }))
         };
     } else {
         cachedData = {
             categories: categories.map(({ _id, ...rest }) => rest),
-            products: products.map(({ _id, ...rest }) => rest)
+            products: products.map(({ _id, ...rest }) => ({
+                ...rest,
+                image: rest.id ? `/api/products/${encodeURIComponent(rest.id)}/image` : ''
+            }))
         };
     }
 
@@ -577,6 +608,50 @@ router.get('/products/featured', async (req, res) => {
     } catch (error) {
         console.error('Error fetching featured products:', error);
         res.status(500).json({ error: 'Failed to fetch featured products' });
+    }
+});
+
+router.get('/products/:id/image', async (req, res) => {
+    try {
+        const productId = String(req.params.id || '').trim();
+        if (!productId) {
+            return res.status(400).send('Invalid product id');
+        }
+
+        const db = await getDb();
+        const doc = await db.collection('products').findOne(
+            { id: productId },
+            {
+                projection: {
+                    _id: 0,
+                    image: 1
+                }
+            }
+        );
+
+        const imageValue = String(doc?.image || '').trim();
+        if (!imageValue) {
+            return res.status(404).send('Image not found');
+        }
+
+        if (/^https?:\/\//i.test(imageValue)) {
+            return res.redirect(imageValue);
+        }
+
+        const dataUriMatch = imageValue.match(/^data:([^;]+);base64,(.+)$/);
+        if (dataUriMatch) {
+            const mimeType = dataUriMatch[1] || 'application/octet-stream';
+            const base64Payload = dataUriMatch[2] || '';
+            const buffer = Buffer.from(base64Payload, 'base64');
+            res.setHeader('Content-Type', mimeType);
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            return res.send(buffer);
+        }
+
+        return res.redirect(imageValue);
+    } catch (error) {
+        console.error('Error fetching product image:', error);
+        return res.status(500).send('Failed to fetch image');
     }
 });
 

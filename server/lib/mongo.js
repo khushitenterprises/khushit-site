@@ -14,8 +14,23 @@ export async function getDb() {
     }
 
     const dbName = process.env.MONGODB_DB || 'khushit';
-    client = client ?? new MongoClient(uri);
-    await client.connect();
-    db = client.db(dbName);
-    return db;
+    if (!client) {
+        client = new MongoClient(uri, {
+            serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 8000),
+            connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 8000),
+            socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 20000)
+        });
+    }
+
+    try {
+        await client.connect();
+        const connectedDb = client.db(dbName);
+        await connectedDb.command({ ping: 1 });
+        db = connectedDb;
+        return db;
+    } catch (error) {
+        client = null;
+        db = null;
+        throw error;
+    }
 }
