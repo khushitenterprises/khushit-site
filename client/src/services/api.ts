@@ -1,7 +1,7 @@
 import { Product, Category, categories as mainCategories } from '../data/products';
+import { buildApiUrl, getApiBaseCandidates } from './apiBase';
 
-const envApiUrl = import.meta.env.VITE_API_URL;
-const API_URL = envApiUrl || '';
+const API_BASES = getApiBaseCandidates();
 const API_TIMEOUT_MS = 12000;
 
 function toSlug(value: string): string {
@@ -71,8 +71,8 @@ function normalizeProduct(raw: any): Product {
     if (imageCandidate) {
         if (/^(https?:)?\/\//i.test(imageCandidate) || imageCandidate.startsWith('data:') || imageCandidate.startsWith('blob:')) {
             image = imageCandidate;
-        } else if (API_URL) {
-            image = imageCandidate.startsWith('/') ? `${API_URL}${imageCandidate}` : `${API_URL}/${imageCandidate}`;
+        } else if (API_BASES[0]) {
+            image = imageCandidate.startsWith('/') ? `${API_BASES[0]}${imageCandidate}` : `${API_BASES[0]}/${imageCandidate}`;
         } else {
             image = imageCandidate;
         }
@@ -151,29 +151,34 @@ function categoryMatches(requestedCategoryId: string, productCategory: string): 
 
 // Generic fetch wrapper with error handling
 async function fetchAPI<T>(endpoint: string): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    let lastError: unknown = null;
 
-    try {
-        const response = await fetch(`${API_URL}/api${endpoint}`, {
-            signal: controller.signal
-        });
+    for (const base of API_BASES) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.statusText}`);
+        try {
+            const url = buildApiUrl(base, endpoint);
+            const response = await fetch(url, { signal: controller.signal });
+
+            if (!response.ok) {
+                throw new Error(`API Error (${response.status}): ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            lastError = error;
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                console.error(`Request timeout for ${endpoint} after ${API_TIMEOUT_MS}ms`, { base });
+            } else {
+                console.error(`Failed to fetch ${endpoint}`, { base, error });
+            }
+        } finally {
+            clearTimeout(timeout);
         }
-
-        return await response.json();
-    } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-            console.error(`Request timeout for ${endpoint} after ${API_TIMEOUT_MS}ms`);
-            throw new Error('Request timed out');
-        }
-        console.error(`Failed to fetch ${endpoint}:`, error);
-        throw error;
-    } finally {
-        clearTimeout(timeout);
     }
+
+    throw lastError instanceof Error ? lastError : new Error('Failed to fetch API data');
 }
 
 // Get all categories
@@ -254,14 +259,23 @@ export async function uploadProductsFile(file: File): Promise<Product[]> {
     // It just does fetch(`${API_URL}/api${endpoint}`). It doesn't set headers or anything.
     // So for POST we need to handle it.
 
-    const response = await fetch(`${API_URL}/api/upload-products`, {
-        method: 'POST',
-        body: formData,
-    });
+    let lastError: unknown = null;
+    for (const base of API_BASES) {
+        try {
+            const response = await fetch(buildApiUrl(base, '/upload-products'), {
+                method: 'POST',
+                body: formData,
+            });
 
-    if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+            if (!response.ok) {
+                throw new Error(`API Error (${response.status}): ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            lastError = error;
+        }
     }
 
-    return await response.json();
+    throw lastError instanceof Error ? lastError : new Error('Failed to upload products');
 }
