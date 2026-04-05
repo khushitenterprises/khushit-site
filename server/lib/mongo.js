@@ -18,7 +18,7 @@ export async function getDb() {
         client = new MongoClient(uri, {
             serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 8000),
             connectTimeoutMS: Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 8000),
-            socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 20000)
+            socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 120000)
         });
     }
 

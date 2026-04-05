@@ -22,6 +22,7 @@ const upload = multer({
 // In-memory cache for ultra-fast responses
 let cachedData = null;
 let cachedSliders = null;
+const productImageCache = new Map();
 
 const defaultSliders = [
     {
@@ -351,6 +352,9 @@ router.post('/admin/products', requireAdmin, upload.single('image'), async (req,
 
         await productsCollection.insertOne(product);
         cachedData = null;
+        if (product.id) {
+            productImageCache.set(product.id, product.image || '');
+        }
 
         return res.status(201).json(product);
     } catch (error) {
@@ -401,6 +405,7 @@ router.put('/admin/products/:id', requireAdmin, upload.single('image'), async (r
         );
 
         cachedData = null;
+        productImageCache.delete(productId);
 
         return res.json({
             id: productId,
@@ -427,6 +432,7 @@ router.delete('/admin/products/:id', requireAdmin, async (req, res) => {
         }
 
         cachedData = null;
+        productImageCache.delete(productId);
 
         return res.status(204).send();
     } catch (error) {
@@ -618,18 +624,42 @@ router.get('/products/:id/image', async (req, res) => {
             return res.status(400).send('Invalid product id');
         }
 
-        const db = await getDb();
-        const doc = await db.collection('products').findOne(
-            { id: productId },
-            {
-                projection: {
-                    _id: 0,
-                    image: 1
+        let imageValue = String(productImageCache.get(productId) || '').trim();
+        if (!imageValue) {
+            let lastError = null;
+            for (let attempt = 0; attempt < 3; attempt += 1) {
+                try {
+                    const db = await getDb();
+                    const doc = await db.collection('products').findOne(
+                        { id: productId },
+                        {
+                            projection: {
+                                _id: 0,
+                                image: 1
+                            }
+                        }
+                    );
+                    imageValue = String(doc?.image || '').trim();
+                    if (imageValue) {
+                        productImageCache.set(productId, imageValue);
+                    }
+                    break;
+                } catch (error) {
+                    lastError = error;
+                    const message = String(error?.message || '').toLowerCase();
+                    const isTimeout = message.includes('timed out') || message.includes('timeout');
+                    if (!isTimeout || attempt === 2) {
+                        throw error;
+                    }
+                    await new Promise((resolve) => setTimeout(resolve, 250));
                 }
             }
-        );
 
-        const imageValue = String(doc?.image || '').trim();
+            if (!imageValue && lastError) {
+                throw lastError;
+            }
+        }
+
         if (!imageValue) {
             return res.status(404).send('Image not found');
         }
