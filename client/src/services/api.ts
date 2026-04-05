@@ -1,4 +1,4 @@
-import { Product, Category, categories as mainCategories } from '../data/products';
+import { Product, Category, categories as mainCategories, products as fallbackProducts } from '../data/products';
 import { buildApiUrl, getApiBaseCandidates } from './apiBase';
 
 const API_BASES = getApiBaseCandidates();
@@ -183,8 +183,23 @@ async function fetchAPI<T>(endpoint: string): Promise<T> {
 
 // Get all categories
 export async function getCategories(): Promise<Category[]> {
-    const categories = await fetchAPI<any[]>('/categories');
-    return Array.isArray(categories) ? categories.map(normalizeCategory).filter((item) => item.id) : [];
+    try {
+        const categories = await fetchAPI<any[]>('/categories');
+        const normalized = Array.isArray(categories)
+            ? categories.map(normalizeCategory).filter((item) => item.id)
+            : [];
+
+        if (normalized.length > 0) {
+            return normalized;
+        }
+    } catch {
+        // Fall back to bundled categories below.
+    }
+
+    return mainCategories.map((category) => ({
+        ...category,
+        productCount: fallbackProducts.filter((product) => categoryMatches(category.id, product.category)).length
+    }));
 }
 
 // Get category by ID
