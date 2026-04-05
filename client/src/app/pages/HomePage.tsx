@@ -1,62 +1,75 @@
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ProductCard } from '../components/ProductCard';
+import { useState, useEffect } from 'react';
+import { Button } from '../components/Button';
 import { CategoryCard } from '../components/CategoryCard';
+import { ProductCard } from '../components/ProductCard';
 import { ImageSlider } from '../components/ImageSlider';
-import { Product, Category } from '../../data/products';
+import { Category, Product } from '../../data/products';
 import * as api from '../../services/api';
-import { Award, Shield, TrendingUp } from 'lucide-react';
+import { Award, Shield, TrendingUp, Sparkles } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
-  const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function loadFromDatabase() {
+    async function fetchData() {
       try {
-        const [productsResult, categoriesResult] = await Promise.all([
-          api.getProducts(),
+        setLoading(true);
+        const [categoriesData, productsData] = await Promise.all([
           api.getCategories(),
+          api.getFeaturedProducts()
         ]);
-        if (!isMounted) {
-          return;
-        }
-        setProducts(productsResult);
-        setCategories(categoriesResult);
-      } catch (error) {
-        console.error('Error loading products from database:', error);
-        if (isMounted) {
-          setProducts([]);
-          setCategories([]);
-        }
+        setCategories(categoriesData);
+        setFeaturedProducts(productsData);
+        setError(null);
+      } catch (err) {
+        setError('Failed to load data. Please make sure the backend server is running.');
+        console.error('Error fetching data:', err);
       } finally {
-        if (isMounted) {
-          setCategoriesLoading(false);
-        }
+        setLoading(false);
       }
     }
 
-    loadFromDatabase();
-
-    return () => {
-      isMounted = false;
-    };
+    fetchData();
   }, []);
 
 
   return (
     <div className="min-h-screen">
-      <>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading products...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+            <h3 className="text-red-800 font-semibold mb-2">Error Loading Data</h3>
+            <p className="text-red-600 mb-4">{error}</p>
+            <p className="text-sm text-red-500">Make sure the backend server is running and your phone is on the same Wi-Fi network.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content - only show when not loading and no error */}
+      {!loading && !error && (
+        <>
           {/* Image Slider Section */}
           <ImageSlider />
 
-          {/* Category Section */}
+          {/* Product Categories Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
             <div className="max-w-7xl mx-auto">
               <motion.div
@@ -66,69 +79,26 @@ export function HomePage() {
                 className="text-center mb-16"
               >
                 <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-                  Shop by Category
+                  Our Product Categories
                 </h2>
                 <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  Click any category to view its products.
+                  Explore our comprehensive range of quality products across multiple categories
                 </p>
               </motion.div>
 
-              {categoriesLoading ? (
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">Loading categories...</p>
-                </div>
-              ) : categories.length === 0 ? (
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">No categories found in database.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {categories.map((category) => (
-                    <CategoryCard key={category.id} category={category} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          {/* Products Section */}
-          <section className="py-20 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-7xl mx-auto">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="text-center mb-16"
-              >
-                <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-                  Our Products
-                </h2>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  Products loaded from database
-                </p>
-              </motion.div>
-
-              {products.length === 0 ? (
-                <div className="text-center py-10">
-                  <p className="text-muted-foreground">No products found.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {products.map((product, index) => (
-                    <motion.div
-                      key={product.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: index * 0.04 }}
-                    >
-                      <Link to={`/products/${encodeURIComponent(product.category)}/${encodeURIComponent(product.id)}`}>
-                        <ProductCard product={product} />
-                      </Link>
-                    </motion.div>
-                  ))}
-                </div>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {categories.map((category, index) => (
+                  <motion.div
+                    key={category.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <CategoryCard category={category} />
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </section>
 
@@ -243,7 +213,8 @@ export function HomePage() {
           </motion.div>
         </div>
       </section> */}
-      </>
+        </>
+      )}
     </div>
   );
 }
