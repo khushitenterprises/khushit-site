@@ -11,12 +11,16 @@ import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadFromDatabase() {
       try {
+        setProductsLoading(true);
+        setProductsError(null);
         const productsResult = await api.getProducts();
         if (!isMounted) {
           return;
@@ -26,6 +30,11 @@ export function HomePage() {
         console.error('Error loading products from database:', error);
         if (isMounted) {
           setProducts([]);
+          setProductsError('Unable to load products right now.');
+        }
+      } finally {
+        if (isMounted) {
+          setProductsLoading(false);
         }
       }
     }
@@ -61,7 +70,15 @@ export function HomePage() {
                 </p>
               </motion.div>
 
-              {products.length === 0 ? (
+              {productsLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+                </div>
+              ) : productsError ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">{productsError}</p>
+                </div>
+              ) : products.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-muted-foreground">No products found.</p>
                 </div>
