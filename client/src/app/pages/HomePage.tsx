@@ -13,6 +13,31 @@ import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
+function toCategoryLabel(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function deriveCategoriesFromProducts(products: Product[]): Category[] {
+  const counts = products.reduce<Record<string, number>>((acc, product) => {
+    const key = String(product.category || '').trim();
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts).map(([id, productCount]) => ({
+    id,
+    name: toCategoryLabel(id),
+    description: '',
+    icon: '',
+    productCount,
+  }));
+}
+
 export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -21,18 +46,29 @@ export function HomePage() {
     let isMounted = true;
 
     async function loadFromDatabase() {
-      try {
-        const [products, dbCategories] = await Promise.all([api.getProducts(), api.getCategories()]);
-        if (isMounted) {
-          setProducts(products);
-          setCategories(dbCategories.filter((category) => Number(category.productCount || 0) > 0));
-        }
-      } catch (error) {
-        console.error('Error loading data from database:', error);
-        if (isMounted) {
-          setCategories([]);
-          setProducts([]);
-        }
+      const [productsResult, categoriesResult] = await Promise.allSettled([
+        api.getProducts(),
+        api.getCategories(),
+      ]);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (productsResult.status === 'fulfilled') {
+        setProducts(productsResult.value);
+      } else {
+        console.error('Error loading products from database:', productsResult.reason);
+        setProducts([]);
+      }
+
+      if (categoriesResult.status === 'fulfilled') {
+        setCategories(categoriesResult.value.filter((category) => Number(category.productCount || 0) > 0));
+      } else {
+        console.error('Error loading categories from database:', categoriesResult.reason);
+        setCategories(
+          productsResult.status === 'fulfilled' ? deriveCategoriesFromProducts(productsResult.value) : []
+        );
       }
     }
 

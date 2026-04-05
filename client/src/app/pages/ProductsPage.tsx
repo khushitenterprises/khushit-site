@@ -1,9 +1,34 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { CategoryCard } from '../components/CategoryCard';
-import { Category } from '../../data/products';
+import { Category, Product } from '../../data/products';
 import * as api from '../../services/api';
 import { Package } from 'lucide-react';
+
+function toCategoryLabel(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function deriveCategoriesFromProducts(products: Product[]): Category[] {
+  const counts = products.reduce<Record<string, number>>((acc, product) => {
+    const key = String(product.category || '').trim();
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts).map(([id, productCount]) => ({
+    id,
+    name: toCategoryLabel(id),
+    description: '',
+    icon: '',
+    productCount,
+  }));
+}
 
 export function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -15,8 +40,18 @@ export function ProductsPage() {
     async function loadCategories() {
       setLoading(true);
       try {
-        const dbCategories = await api.getCategories();
-        const nextCategories = dbCategories.filter((category) => Number(category.productCount || 0) > 0);
+        const [categoriesResult, productsResult] = await Promise.allSettled([
+          api.getCategories(),
+          api.getProducts(),
+        ]);
+
+        const nextCategories =
+          categoriesResult.status === 'fulfilled'
+            ? categoriesResult.value.filter((category) => Number(category.productCount || 0) > 0)
+            : productsResult.status === 'fulfilled'
+              ? deriveCategoriesFromProducts(productsResult.value)
+              : [];
+
         if (isMounted) {
           setCategories(nextCategories);
         }

@@ -49,21 +49,24 @@ export function CategoryDetailPage() {
 
       try {
         setLoading(true);
-        const dbCategories = await api.getCategories();
-        const resolvedCategory = resolveDatabaseCategory(categoryId, dbCategories);
-
-        if (!resolvedCategory) {
-          setCategory(null);
-          setFilteredProducts([]);
-          setError('Category not found');
-          return;
-        }
-
-        const nextProducts = await api.getProductsByCategory(resolvedCategory.id);
-        const nextCategory = {
-          ...resolvedCategory,
-          productCount: nextProducts.length,
-        };
+        const [productsResult, categoriesResult] = await Promise.allSettled([
+          api.getProductsByCategory(categoryId),
+          api.getCategories(),
+        ]);
+        const nextProducts = productsResult.status === 'fulfilled' ? productsResult.value : [];
+        const resolvedCategory =
+          categoriesResult.status === 'fulfilled'
+            ? resolveDatabaseCategory(categoryId, categoriesResult.value)
+            : null;
+        const nextCategory =
+          resolvedCategory ||
+          ({
+            id: categoryId,
+            name: categoryId.replace(/-/g, ' '),
+            description: '',
+            icon: '',
+            productCount: nextProducts.length,
+          } as Category);
 
         setCategory(nextCategory);
         setFilteredProducts(nextProducts);
