@@ -1,77 +1,32 @@
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CategoryCard } from '../components/CategoryCard';
 import { ProductCard } from '../components/ProductCard';
 import { ImageSlider } from '../components/ImageSlider';
-import {
-  Category,
-  Product,
-} from '../../data/products';
+import { Product } from '../../data/products';
 import * as api from '../../services/api';
 import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
-function toCategoryLabel(value: string): string {
-  return String(value || '')
-    .trim()
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function deriveCategoriesFromProducts(products: Product[]): Category[] {
-  const counts = products.reduce<Record<string, number>>((acc, product) => {
-    const key = String(product.category || '').trim();
-    if (!key) return acc;
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
-
-  return Object.entries(counts).map(([id, productCount]) => ({
-    id,
-    name: toCategoryLabel(id),
-    description: '',
-    icon: '',
-    productCount,
-  }));
-}
-
 export function HomePage() {
-  const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadFromDatabase() {
-      const [productsResult, categoriesResult] = await Promise.allSettled([
-        api.getProducts(),
-        api.getCategories(),
-      ]);
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (productsResult.status === 'fulfilled') {
-        setProducts(productsResult.value);
-      } else {
-        console.error('Error loading products from database:', productsResult.reason);
-        setProducts([]);
-      }
-
-      if (categoriesResult.status === 'fulfilled') {
-        const categoriesFromApi = categoriesResult.value.filter((category) => Number(category.productCount || 0) > 0);
-        const categoriesFromProducts =
-          productsResult.status === 'fulfilled' ? deriveCategoriesFromProducts(productsResult.value) : [];
-        setCategories(categoriesFromApi.length > 0 ? categoriesFromApi : categoriesFromProducts);
-      } else {
-        console.error('Error loading categories from database:', categoriesResult.reason);
-        setCategories(
-          productsResult.status === 'fulfilled' ? deriveCategoriesFromProducts(productsResult.value) : []
-        );
+      try {
+        const productsResult = await api.getProducts();
+        if (!isMounted) {
+          return;
+        }
+        setProducts(productsResult);
+      } catch (error) {
+        console.error('Error loading products from database:', error);
+        if (isMounted) {
+          setProducts([]);
+        }
       }
     }
 
@@ -88,39 +43,6 @@ export function HomePage() {
       <>
           {/* Image Slider Section */}
           <ImageSlider />
-
-          {/* Product Categories Section */}
-          <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
-            <div className="max-w-7xl mx-auto">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="text-center mb-16"
-              >
-                <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
-                  Our Product Categories
-                </h2>
-                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-                  Explore our comprehensive range of quality products across multiple categories
-                </p>
-              </motion.div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {categories.map((category, index) => (
-                  <motion.div
-                    key={category.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <CategoryCard category={category} />
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </section>
 
           {/* Products Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8">
