@@ -1,4 +1,4 @@
-import { Product, Category, categories as mainCategories, products as fallbackProducts } from '../data/products';
+import { Product, Category, categories as mainCategories } from '../data/products';
 
 const envApiUrl = import.meta.env.VITE_API_URL;
 const API_URL = envApiUrl || '';
@@ -210,26 +210,15 @@ export async function getProductsByCategory(categoryId: string): Promise<Product
         const matchedFromCategoryEndpoint = normalized.filter((item) =>
             categoryMatches(categoryId, item.category)
         );
-        if (matchedFromCategoryEndpoint.length > 0) {
-            return matchedFromCategoryEndpoint;
-        }
-        const allProducts = await getProducts();
-        const matched = allProducts.filter((item) => categoryMatches(categoryId, item.category));
-        if (matched.length > 0) {
-            return matched;
-        }
-        return fallbackProducts.filter((item) => categoryMatches(categoryId, item.category));
+        return matchedFromCategoryEndpoint;
     } catch {
         try {
             const products = await getProducts();
             const matched = products.filter((item) => categoryMatches(categoryId, item.category));
-            if (matched.length > 0) {
-                return matched;
-            }
+            return matched;
         } catch {
-            // Fall through to local fallback below.
+            return [];
         }
-        return fallbackProducts.filter((item) => categoryMatches(categoryId, item.category));
     }
 }
 

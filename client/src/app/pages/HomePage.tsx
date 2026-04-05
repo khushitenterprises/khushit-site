@@ -1,101 +1,42 @@
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CategoryCard } from '../components/CategoryCard';
+import { ProductCard } from '../components/ProductCard';
 import { ImageSlider } from '../components/ImageSlider';
 import {
   Category,
-  categories as mainCategories,
+  Product,
 } from '../../data/products';
 import * as api from '../../services/api';
 import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
 import c2 from '../../assets/c2.PNG';
 
-function toSlug(value: string): string {
-  return String(value || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function normalizeCategoryKey(value: string): string {
-  return toSlug(value).replace(/-/g, '');
-}
-
-function getCategoryKeys(category: Category): string[] {
-  const aliases: Record<string, string[]> = {
-    airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
-    handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
-    toiletries: ['toiletry', 'personal-care', 'personalcare'],
-  };
-
-  const keys = [category.id, category.name, ...(aliases[category.id] || [])];
-  return Array.from(new Set(keys.map(normalizeCategoryKey).filter(Boolean)));
-}
-
 export function HomePage() {
-  const [categories, setCategories] = useState<Category[]>(mainCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadCategoriesFromProducts() {
-      const categoryKeys = new Map<string, string[]>(
-        mainCategories.map((category) => [category.id, getCategoryKeys(category)])
-      );
-      const counts = new Map<string, number>();
-
+    async function loadFromDatabase() {
       try {
-        const products = await api.getProducts();
-        products.forEach((product) => {
-          const productKey = normalizeCategoryKey(product.category || '');
-          if (!productKey) return;
-          const matchedCategory = mainCategories.find((category) =>
-            (categoryKeys.get(category.id) || []).includes(productKey)
-          );
-          if (!matchedCategory) return;
-          counts.set(matchedCategory.id, (counts.get(matchedCategory.id) || 0) + 1);
-        });
-      } catch (productsError) {
-        console.error('Error loading categories from products:', productsError);
-      }
-
-      if (counts.size === 0) {
-        try {
-          const dbCategories = await api.getCategories();
-          dbCategories.forEach((dbCategory) => {
-            const dbKeys = [
-              normalizeCategoryKey(dbCategory.id),
-              normalizeCategoryKey(dbCategory.name),
-            ].filter(Boolean);
-            const matchedCategory = mainCategories.find((category) =>
-              dbKeys.some((key) => (categoryKeys.get(category.id) || []).includes(key))
-            );
-            if (!matchedCategory) return;
-            counts.set(
-              matchedCategory.id,
-              Number(dbCategory.productCount || 0) || counts.get(matchedCategory.id) || 1
-            );
-          });
-        } catch (categoriesError) {
-          console.error('Error loading categories:', categoriesError);
+        const [products, dbCategories] = await Promise.all([api.getProducts(), api.getCategories()]);
+        if (isMounted) {
+          setProducts(products);
+          setCategories(dbCategories.filter((category) => Number(category.productCount || 0) > 0));
         }
-      }
-
-      const nextCategories = mainCategories
-        .filter((category) => (counts.get(category.id) || 0) > 0)
-        .map((category) => ({
-          ...category,
-          productCount: counts.get(category.id) || category.productCount,
-        }));
-
-      if (isMounted) {
-        setCategories(nextCategories.length > 0 ? nextCategories : mainCategories);
+      } catch (error) {
+        console.error('Error loading data from database:', error);
+        if (isMounted) {
+          setCategories([]);
+          setProducts([]);
+        }
       }
     }
 
-    loadCategoriesFromProducts();
+    loadFromDatabase();
 
     return () => {
       isMounted = false;
@@ -139,6 +80,47 @@ export function HomePage() {
                   </motion.div>
                 ))}
               </div>
+            </div>
+          </section>
+
+          {/* Products Section */}
+          <section className="py-20 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="text-center mb-16"
+              >
+                <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
+                  Our Products
+                </h2>
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                  Products loaded from database
+                </p>
+              </motion.div>
+
+              {products.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">No products found.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {products.map((product, index) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.04 }}
+                    >
+                      <Link to={`/products/${product.category}/${product.id}`}>
+                        <ProductCard product={product} />
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
