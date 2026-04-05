@@ -2,33 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ProductCard } from '../components/ProductCard';
-import { Product, Category, categories as mainCategories } from '../../data/products';
+import { Product, Category } from '../../data/products';
 import * as api from '../../services/api';
-import { ChevronRight } from 'lucide-react';
-
-function toSlug(value: string): string {
-  return String(value || '')
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
-function resolveMainCategory(routeCategoryId: string): Category | null {
-  const aliases: Record<string, string[]> = {
-    airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
-    handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
-    toiletries: ['toiletry', 'personal-care', 'personalcare'],
-  };
-  const routeKey = toSlug(routeCategoryId);
-
-  return (
-    mainCategories.find((item) => {
-      const keys = [item.id, item.name, ...(aliases[item.id] || [])].map(toSlug);
-      return keys.includes(routeKey);
-    }) || null
-  );
-}
+import { ChevronRight, Filter } from 'lucide-react';
 
 export function CategoryDetailPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -45,27 +21,16 @@ export function CategoryDetailPage() {
 
       try {
         setLoading(true);
-        const fallbackCategory = resolveMainCategory(categoryId);
-        const resolvedCategoryId = fallbackCategory?.id || categoryId;
-
-        const productsResult = await Promise.allSettled([api.getProductsByCategory(resolvedCategoryId)]);
-        const nextProducts = productsResult[0].status === 'fulfilled' ? productsResult[0].value : [];
-        const nextCategory =
-          fallbackCategory ||
-          ({
-            id: resolvedCategoryId,
-            name: resolvedCategoryId.replace(/-/g, ' '),
-            description: '',
-            icon: '📦',
-            productCount: nextProducts.length
-          } as Category);
-
-        setCategory(nextCategory);
-        setProducts(nextProducts);
-        setFilteredProducts(nextProducts);
+        const [categoryData, productsData] = await Promise.all([
+          api.getCategoryById(categoryId),
+          api.getProductsByCategory(categoryId)
+        ]);
+        setCategory(categoryData);
+        setProducts(productsData);
+        setFilteredProducts(productsData);
         setError(null);
       } catch (err) {
-        setError('Failed to load products for this category');
+        setError('Failed to load category data');
         console.error('Error fetching category data:', err);
       } finally {
         setLoading(false);

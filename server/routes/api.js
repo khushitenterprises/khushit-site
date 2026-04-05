@@ -11,7 +11,6 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'harshkothiya0807@gmail.com';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'khushit';
-const DATA_CACHE_TTL_MS = Number(process.env.DATA_CACHE_TTL_MS || 30000);
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -22,63 +21,38 @@ const upload = multer({
 
 // In-memory cache for ultra-fast responses
 let cachedData = null;
-let cachedAt = 0;
+let cachedSliders = null;
 
-function toSlug(value) {
-    return String(value || '')
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-}
-
-function normalizeCategoryKey(value) {
-    return toSlug(value).replace(/-/g, '');
-}
-
-function getCategoryAliases(categoryId) {
-    const aliases = {
-        'bath-soaps': ['bath-soap', 'bathsoap', 'bathsoaps', 'soap', 'soaps'],
-        detergents: ['detergent'],
-        'fabric-conditioner': ['fabricconditioner', 'fabric-conditioners', 'fabricconditioners', 'fabric-softener', 'fabricsoftener'],
-        airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
-        'hair-oil': ['hair-oils', 'hairoil', 'hairoils'],
-        handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid', 'hand-wash-liquid'],
-        shampoo: ['shampoos'],
-        toiletries: ['toiletry', 'personal-care', 'personalcare'],
-    };
-
-    return aliases[String(categoryId || '')] || [];
-}
-
-function buildCategoryKeyMap(categories = []) {
-    const map = new Map();
-
-    categories.forEach((category) => {
-        const categoryId = String(category?.id || '').trim();
-        const categoryName = String(category?.name || '').trim();
-        if (!categoryId) {
-            return;
-        }
-
-        const keys = [categoryId, categoryName, ...getCategoryAliases(categoryId)]
-            .map(normalizeCategoryKey)
-            .filter(Boolean);
-
-        keys.forEach((key) => map.set(key, categoryId));
-    });
-
-    return map;
-}
-
-function resolveCategoryId(inputCategory, categoryKeyMap) {
-    const key = normalizeCategoryKey(inputCategory);
-    if (!key) {
-        return '';
+const defaultSliders = [
+    {
+        id: 'sld_1',
+        src: '/allairdrops.jpeg',
+        alt: 'Product showcase 1',
+        title: 'Premium Quality Products',
+        link: '/products/airdrops'
+    },
+    {
+        id: 'sld_2',
+        src: '/allairdrops.jpeg',
+        alt: 'Product showcase 2',
+        title: 'Trusted by Thousands',
+        link: ''
+    },
+    {
+        id: 'sld_3',
+        src: '/allairdrops.jpeg',
+        alt: 'Product showcase 3',
+        title: 'Daily Essentials',
+        link: ''
+    },
+    {
+        id: 'sld_4',
+        src: '/allairdrops.jpeg',
+        alt: 'Product showcase 4',
+        title: 'Excellence in Every Product',
+        link: ''
     }
-
-    return categoryKeyMap.get(key) || '';
-}
+];
 
 function isValidAdmin(email, password) {
     return email === ADMIN_EMAIL && password === ADMIN_PASSWORD;
@@ -194,7 +168,7 @@ function sanitizeSliderPayload(payload = {}, file = null, options = {}) {
 
 // Helper function to read products data with caching
 async function getProductsData() {
-    if (cachedData && Date.now() - cachedAt < DATA_CACHE_TTL_MS) {
+    if (cachedData) {
         return cachedData;
     }
 
@@ -204,20 +178,13 @@ async function getProductsData() {
 
     if (categories.length === 0 || products.length === 0) {
         const dataPath = path.join(__dirname, '../data/products.json');
-        let data = { categories: [], products: [] };
+        const data = JSON.parse(await fs.readFile(dataPath, 'utf-8'));
 
-        try {
-            const fileContent = await fs.readFile(dataPath, 'utf-8');
-            data = JSON.parse(fileContent);
-        } catch (error) {
-            console.warn(`Seed data file not found at ${dataPath}. Skipping seeding.`, error.message);
-        }
-
-        if (categories.length === 0 && Array.isArray(data.categories) && data.categories.length) {
+        if (categories.length === 0 && data.categories?.length) {
             await db.collection('categories').insertMany(data.categories);
         }
 
-        if (products.length === 0 && Array.isArray(data.products) && data.products.length) {
+        if (products.length === 0 && data.products?.length) {
             await db.collection('products').insertMany(data.products);
         }
 
@@ -234,15 +201,13 @@ async function getProductsData() {
         };
     }
 
-    cachedAt = Date.now();
     console.log('Data cached in memory for fast access');
     return cachedData;
 }
 
 function withDynamicProductCounts(categories = [], products = []) {
-    const categoryKeyMap = buildCategoryKeyMap(categories);
     const countsByCategory = products.reduce((acc, product) => {
-        const categoryId = resolveCategoryId(product.category, categoryKeyMap);
+        const categoryId = String(product.category || '');
         if (!categoryId) {
             return acc;
         }
@@ -258,29 +223,33 @@ function withDynamicProductCounts(categories = [], products = []) {
 }
 
 async function getSlidersData() {
+    if (cachedSliders) {
+        return cachedSliders;
+    }
+
     const db = await getDb();
     const slidersCollection = db.collection('sliders');
     const sliders = await slidersCollection.find({}).sort({ createdAt: 1, id: 1 }).toArray();
 
-    return sliders
-        .map(({ _id, createdAt, ...rest }, index) => {
-            const id = String(rest.id || _id || `sld_${index + 1}`).trim();
-            const title = String(rest.title || rest.alt || `Slider ${index + 1}`).trim();
-            const alt = String(rest.alt || rest.title || title).trim();
-            const link = String(rest.link || '').trim();
-            const src = String(rest.src || rest.image || rest.url || rest.photo || '')
-                .trim()
-                .replace('/allairdrop.jpeg', '/allairdrops.jpeg');
+    if (sliders.length === 0) {
+        const seed = defaultSliders.map((slider) => ({
+            ...slider,
+            createdAt: new Date()
+        }));
+        await slidersCollection.insertMany(seed);
+        const seeded = await slidersCollection.find({}).sort({ createdAt: 1, id: 1 }).toArray();
+        cachedSliders = seeded.map(({ _id, createdAt, ...rest }) => ({
+            ...rest,
+            src: String(rest.src || '').replace('/allairdrop.jpeg', '/allairdrops.jpeg')
+        }));
+    } else {
+        cachedSliders = sliders.map(({ _id, createdAt, ...rest }) => ({
+            ...rest,
+            src: String(rest.src || '').replace('/allairdrop.jpeg', '/allairdrops.jpeg')
+        }));
+    }
 
-            return {
-                id,
-                title,
-                alt,
-                link,
-                src
-            };
-        })
-        .filter((item) => item.src);
+    return cachedSliders;
 }
 
 router.post('/admin/login', (req, res) => {
@@ -463,6 +432,8 @@ router.post('/admin/sliders', requireAdmin, upload.single('image'), async (req, 
         };
 
         await slidersCollection.insertOne(slider);
+        cachedSliders = null;
+
         const { createdAt, ...responseBody } = slider;
         return res.status(201).json(responseBody);
     } catch (error) {
@@ -509,6 +480,8 @@ router.put('/admin/sliders/:id', requireAdmin, upload.single('image'), async (re
             }
         );
 
+        cachedSliders = null;
+
         return res.json({
             id: sliderId,
             ...update
@@ -532,6 +505,8 @@ router.delete('/admin/sliders/:id', requireAdmin, async (req, res) => {
         if (result.deletedCount === 0) {
             return res.status(404).json({ error: 'Slider not found' });
         }
+
+        cachedSliders = null;
 
         return res.status(204).send();
     } catch (error) {
@@ -584,13 +559,7 @@ router.get('/products', async (req, res) => {
 router.get('/products/category/:categoryId', async (req, res) => {
     try {
         const data = await getProductsData();
-        const categoryKeyMap = buildCategoryKeyMap(data.categories);
-        const requestedCategoryId =
-            resolveCategoryId(req.params.categoryId, categoryKeyMap) || String(req.params.categoryId || '').trim();
-
-        const products = data.products.filter(
-            (p) => resolveCategoryId(p.category, categoryKeyMap) === requestedCategoryId
-        );
+        const products = data.products.filter(p => p.category === req.params.categoryId);
         res.json(products);
     } catch (error) {
         console.error('Error fetching products by category:', error);
