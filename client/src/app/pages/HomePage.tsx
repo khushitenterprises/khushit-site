@@ -63,7 +63,10 @@ export function HomePage() {
       }
 
       if (categoriesResult.status === 'fulfilled') {
-        setCategories(categoriesResult.value.filter((category) => Number(category.productCount || 0) > 0));
+        const categoriesFromApi = categoriesResult.value.filter((category) => Number(category.productCount || 0) > 0);
+        const categoriesFromProducts =
+          productsResult.status === 'fulfilled' ? deriveCategoriesFromProducts(productsResult.value) : [];
+        setCategories(categoriesFromApi.length > 0 ? categoriesFromApi : categoriesFromProducts);
       } else {
         console.error('Error loading categories from database:', categoriesResult.reason);
         setCategories(
@@ -150,7 +153,7 @@ export function HomePage() {
                       viewport={{ once: true }}
                       transition={{ delay: index * 0.04 }}
                     >
-                      <Link to={`/products/${product.category}/${product.id}`}>
+                      <Link to={`/products/${encodeURIComponent(product.category)}/${encodeURIComponent(product.id)}`}>
                         <ProductCard product={product} />
                       </Link>
                     </motion.div>

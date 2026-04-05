@@ -185,7 +185,7 @@ export function CategoryDetailPage() {
                     viewport={{ once: true }}
                     transition={{ delay: index * 0.05 }}
                   >
-                    <Link to={`/products/${category.id}/${product.id}`}>
+                    <Link to={`/products/${encodeURIComponent(category.id)}/${encodeURIComponent(product.id)}`}>
                       <ProductCard product={product} />
                     </Link>
                   </motion.div>
