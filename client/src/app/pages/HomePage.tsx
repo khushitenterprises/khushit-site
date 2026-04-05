@@ -21,15 +21,25 @@ export function HomePage() {
     async function fetchData() {
       try {
         setLoading(true);
-        const [categoriesData, productsData] = await Promise.all([
+        const [categoriesResult, productsResult] = await Promise.allSettled([
           api.getCategories(),
           api.getFeaturedProducts()
         ]);
+
+        const categoriesData = categoriesResult.status === 'fulfilled' ? categoriesResult.value : [];
+        const productsData = productsResult.status === 'fulfilled' ? productsResult.value : [];
+
         console.log('[HomePage] categories:', categoriesData.length, categoriesData);
         console.log('[HomePage] featuredProducts:', productsData.length, productsData);
+
         setCategories(categoriesData);
         setFeaturedProducts(productsData);
-        setError(null);
+
+        if (categoriesResult.status === 'rejected' && productsResult.status === 'rejected') {
+          setError('Failed to load data. Please make sure the backend server is running.');
+        } else {
+          setError(null);
+        }
       } catch (err) {
         setError('Failed to load data. Please make sure the backend server is running.');
         console.error('Error fetching data:', err);
@@ -55,7 +65,7 @@ export function HomePage() {
       )}
 
       {/* Error State */}
-      {error && (
+      {!loading && error && categories.length === 0 && featuredProducts.length === 0 && (
         <div className="flex items-center justify-center min-h-screen">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
             <h3 className="text-red-800 font-semibold mb-2">Error Loading Data</h3>
@@ -66,7 +76,7 @@ export function HomePage() {
       )}
 
       {/* Main Content - only show when not loading and no error */}
-      {!loading && !error && (
+      {!loading && (!error || categories.length > 0 || featuredProducts.length > 0) && (
         <>
           {/* Image Slider Section */}
           <ImageSlider />
