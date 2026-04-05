@@ -3,6 +3,7 @@ import { Product, Category, categories as mainCategories } from '../data/product
 const envApiUrl = import.meta.env.VITE_API_URL;
 const API_URL = String(envApiUrl || '').trim().replace(/\/+$/, '');
 const API_TIMEOUT_MS = 12000;
+const API_BASE_CANDIDATES = Array.from(new Set([API_URL, '']));
 
 function toSlug(value: string): string {
     return String(value || '')
@@ -150,29 +151,38 @@ function categoryMatches(requestedCategoryId: string, productCategory: string): 
 }
 
 async function fetchAPI<T>(endpoint: string): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const errors: string[] = [];
 
-    try {
-        const response = await fetch(`${API_URL}/api${endpoint}`, {
-            signal: controller.signal,
-        });
+    for (const base of API_BASE_CANDIDATES) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+        const url = `${base ? `${base}` : ''}/api${endpoint}`;
 
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        try {
+            const response = await fetch(url, {
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            const reason =
+                error instanceof DOMException && error.name === 'AbortError'
+                    ? `timeout after ${API_TIMEOUT_MS}ms`
+                    : error instanceof Error
+                      ? error.message
+                      : 'unknown error';
+            errors.push(`${url} -> ${reason}`);
+        } finally {
+            clearTimeout(timeout);
         }
-
-        return await response.json();
-    } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-            console.error(`Request timeout for ${endpoint} after ${API_TIMEOUT_MS}ms`);
-            throw new Error('Request timed out');
-        }
-        console.error(`Failed to fetch ${endpoint}:`, error);
-        throw error;
-    } finally {
-        clearTimeout(timeout);
     }
+
+    console.error(`Failed to fetch ${endpoint} using all API bases:`, errors);
+    throw new Error(`Failed to fetch ${endpoint}`);
 }
 
 export async function getCategories(): Promise<Category[]> {
