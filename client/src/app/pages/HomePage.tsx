@@ -2,8 +2,9 @@ import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '../components/ProductCard';
+import { CategoryCard } from '../components/CategoryCard';
 import { ImageSlider } from '../components/ImageSlider';
-import { Product } from '../../data/products';
+import { Product, Category } from '../../data/products';
 import * as api from '../../services/api';
 import { Award, Shield, TrendingUp } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
@@ -11,21 +12,32 @@ import c2 from '../../assets/c2.PNG';
 
 export function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadFromDatabase() {
       try {
-        const productsResult = await api.getProducts();
+        const [productsResult, categoriesResult] = await Promise.all([
+          api.getProducts(),
+          api.getCategories(),
+        ]);
         if (!isMounted) {
           return;
         }
         setProducts(productsResult);
+        setCategories(categoriesResult);
       } catch (error) {
         console.error('Error loading products from database:', error);
         if (isMounted) {
           setProducts([]);
+          setCategories([]);
+        }
+      } finally {
+        if (isMounted) {
+          setCategoriesLoading(false);
         }
       }
     }
@@ -43,6 +55,41 @@ export function HomePage() {
       <>
           {/* Image Slider Section */}
           <ImageSlider />
+
+          {/* Category Section */}
+          <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+            <div className="max-w-7xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="text-center mb-16"
+              >
+                <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4">
+                  Shop by Category
+                </h2>
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                  Click any category to view its products.
+                </p>
+              </motion.div>
+
+              {categoriesLoading ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">Loading categories...</p>
+                </div>
+              ) : categories.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">No categories found in database.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {categories.map((category) => (
+                    <CategoryCard key={category.id} category={category} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
 
           {/* Products Section */}
           <section className="py-20 px-4 sm:px-6 lg:px-8">
