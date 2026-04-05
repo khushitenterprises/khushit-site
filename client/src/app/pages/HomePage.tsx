@@ -5,7 +5,12 @@ import { Button } from '../components/Button';
 import { CategoryCard } from '../components/CategoryCard';
 import { ProductCard } from '../components/ProductCard';
 import { ImageSlider } from '../components/ImageSlider';
-import { Category, Product } from '../../data/products';
+import {
+  Category,
+  Product,
+  categories as fallbackCategories,
+  getFeaturedProducts as getFallbackFeaturedProducts,
+} from '../../data/products';
 import * as api from '../../services/api';
 import { Award, Shield, TrendingUp, Sparkles } from 'lucide-react';
 import c1 from '../../assets/c1.PNG';
@@ -15,7 +20,6 @@ export function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -36,13 +40,16 @@ export function HomePage() {
         setFeaturedProducts(productsData);
 
         if (categoriesResult.status === 'rejected' && productsResult.status === 'rejected') {
-          setError('Failed to load data. Please make sure the backend server is running.');
+          // Do not block the homepage when backend is temporarily unavailable.
+          setCategories(fallbackCategories);
+          setFeaturedProducts(getFallbackFeaturedProducts());
         } else {
-          setError(null);
+          // no-op
         }
       } catch (err) {
-        setError('Failed to load data. Please make sure the backend server is running.');
         console.error('Error fetching data:', err);
+        setCategories(fallbackCategories);
+        setFeaturedProducts(getFallbackFeaturedProducts());
       } finally {
         setLoading(false);
       }
@@ -64,19 +71,8 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Error State */}
-      {!loading && error && categories.length === 0 && featuredProducts.length === 0 && (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-            <h3 className="text-red-800 font-semibold mb-2">Error Loading Data</h3>
-            <p className="text-red-600 mb-4">{error}</p>
-            <p className="text-sm text-red-500">Make sure the backend server is running and your phone is on the same Wi-Fi network.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content - only show when not loading and no error */}
-      {!loading && (!error || categories.length > 0 || featuredProducts.length > 0) && (
+      {/* Main Content */}
+      {!loading && (
         <>
           {/* Image Slider Section */}
           <ImageSlider />
