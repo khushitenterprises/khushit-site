@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
@@ -19,10 +19,11 @@ const ProductDetailPage = lazy(() =>
 );
 const RegisterPage = lazy(() => import('./pages/RegisterPage').then((module) => ({ default: module.RegisterPage })));
 const AdminPage = lazy(() => import('./pages/AdminPage').then((module) => ({ default: module.AdminPage })));
+const REGISTRATION_MODAL_LAST_SHOWN_KEY = 'registration_modal_last_shown_at';
+const REGISTRATION_MODAL_COOLDOWN_MS = 5 * 60 * 1000;
 
 function AppShell() {
   const [showRegistration, setShowRegistration] = useState(false);
-  const reopenTimerRef = useRef<number | null>(null);
   const location = useLocation();
   const suppressPopupRoutes = new Set(['/register', '/admin']);
   const shouldShowPopup = !suppressPopupRoutes.has(location.pathname);
@@ -38,10 +39,6 @@ function AppShell() {
   useEffect(() => {
     if (!shouldShowPopup) {
       setShowRegistration(false);
-      if (reopenTimerRef.current) {
-        clearTimeout(reopenTimerRef.current);
-        reopenTimerRef.current = null;
-      }
       return;
     }
 
@@ -50,50 +47,34 @@ function AppShell() {
       return;
     }
 
+    const lastShownAt = Number(localStorage.getItem(REGISTRATION_MODAL_LAST_SHOWN_KEY) || '0');
+    if (Date.now() - lastShownAt < REGISTRATION_MODAL_COOLDOWN_MS) {
+      return;
+    }
+
     const timer = setTimeout(() => {
+      localStorage.setItem(REGISTRATION_MODAL_LAST_SHOWN_KEY, Date.now().toString());
       setShowRegistration(true);
     }, 5000);
 
     return () => {
       clearTimeout(timer);
-      if (reopenTimerRef.current) {
-        clearTimeout(reopenTimerRef.current);
-      }
     };
   }, [shouldShowPopup]);
 
   const handleRegistrationComplete = () => {
     sessionStorage.setItem('registration_completed', 'true');
     setShowRegistration(false);
-    if (reopenTimerRef.current) {
-      clearTimeout(reopenTimerRef.current);
-      reopenTimerRef.current = null;
-    }
   };
 
   const handleRegistrationCancel = () => {
-    const alreadyRegistered = sessionStorage.getItem('registration_completed') === 'true';
-    if (alreadyRegistered) {
-      return;
-    }
-
     setShowRegistration(false);
-
-    if (reopenTimerRef.current) {
-      clearTimeout(reopenTimerRef.current);
-    }
-
-    reopenTimerRef.current = window.setTimeout(() => {
-      const isDone = sessionStorage.getItem('registration_completed') === 'true';
-      if (!isDone) {
-        setShowRegistration(true);
-      }
-    }, 10000);
   };
 
   const handleOpenRegistration = () => {
     const alreadyRegistered = sessionStorage.getItem('registration_completed') === 'true';
     if (!alreadyRegistered) {
+      localStorage.setItem(REGISTRATION_MODAL_LAST_SHOWN_KEY, Date.now().toString());
       setShowRegistration(true);
     }
   };

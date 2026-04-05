@@ -15,33 +15,7 @@ interface SliderImage {
   link?: string;
 }
 
-const fallbackSliderImages: SliderImage[] = [
-  {
-    id: 'sld_1',
-    src: '/allairdrops.jpeg',
-    alt: 'Product showcase 1',
-    title: 'Premium Quality Products',
-    link: '/products/airdrops',
-  },
-  {
-    id: 'sld_2',
-    src: '/allairdrops.jpeg',
-    alt: 'Product showcase 2',
-    title: 'Trusted by Thousands',
-  },
-  {
-    id: 'sld_3',
-    src: '/allairdrops.jpeg',
-    alt: 'Product showcase 3',
-    title: 'Daily Essentials',
-  },
-  {
-    id: 'sld_4',
-    src: '/allairdrops.jpeg',
-    alt: 'Product showcase 4',
-    title: 'Excellence in Every Product',
-  },
-];
+const fallbackSliderImages: SliderImage[] = [];
 
 export function ImageSlider() {
   const apiBase = useMemo(() => import.meta.env.VITE_API_URL || '', []);
@@ -50,10 +24,10 @@ export function ImageSlider() {
   const [current, setCurrent] = useState(0);
   const carouselApiRef = useRef<any>(null);
   const [isAutoplay, setIsAutoplay] = useState(true);
-  const visibleSliderImages = useMemo(() => {
-    const visible = sliderImages.filter((image) => !failedImageIds.includes(image.id));
-    return visible.length ? visible : fallbackSliderImages;
-  }, [sliderImages, failedImageIds]);
+  const visibleSliderImages = useMemo(
+    () => sliderImages.filter((image) => !failedImageIds.includes(image.id)),
+    [sliderImages, failedImageIds]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -108,6 +82,16 @@ export function ImageSlider() {
 
     return () => clearInterval(timer);
   }, [isAutoplay]);
+
+  if (visibleSliderImages.length === 0) {
+    return (
+      <section className="w-full px-0 mt-20 mb-0">
+        <div className="w-full">
+          <div className="relative w-full" style={{ aspectRatio: '16 / 6', maxHeight: '650px' }} />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="w-full px-0 mt-20 mb-0">
