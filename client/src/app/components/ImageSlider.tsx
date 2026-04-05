@@ -48,14 +48,10 @@ const codeSliderImages: SliderImage[] = [
 
 export function ImageSlider() {
   const [sliderImages] = useState<SliderImage[]>(codeSliderImages);
-  const [failedImageIds, setFailedImageIds] = useState<string[]>([]);
   const [current, setCurrent] = useState(0);
   const carouselApiRef = useRef<any>(null);
   const [isAutoplay, setIsAutoplay] = useState(true);
-  const visibleSliderImages = useMemo(
-    () => sliderImages.filter((image) => !failedImageIds.includes(image.id)),
-    [sliderImages, failedImageIds]
-  );
+  const visibleSliderImages = useMemo(() => sliderImages, [sliderImages]);
 
   useEffect(() => {
     if (!isAutoplay) return;
@@ -117,7 +113,11 @@ export function ImageSlider() {
                       fetchPriority={index === 0 ? 'high' : 'auto'}
                       draggable={false}
                       onError={(e) => {
-                        setFailedImageIds((prev) => (prev.includes(image.id) ? prev : [...prev, image.id]));
+                        const target = e.currentTarget as HTMLImageElement;
+                        if (target.src.endsWith('/allairdrops.jpeg')) {
+                          return;
+                        }
+                        target.src = '/allairdrops.jpeg';
                       }}
                     />
                   </div>
