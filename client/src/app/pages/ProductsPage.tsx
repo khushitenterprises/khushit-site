@@ -1,37 +1,35 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Package } from 'lucide-react';
-import { Category, Product } from '../../data/products';
+import { Category, categories as mainCategories } from '../../data/products';
 import { CategoryCard } from '../components/CategoryCard';
 import * as api from '../../services/api';
 
-function toCategoryLabel(value: string): string {
+function toSlug(value: string): string {
   return String(value || '')
+    .toLowerCase()
     .trim()
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
-function deriveCategoriesFromProducts(products: Product[]): Category[] {
-  const counts = products.reduce<Record<string, number>>((acc, product) => {
-    const key = String(product.category || '').trim();
-    if (!key) return acc;
-    acc[key] = (acc[key] || 0) + 1;
-    return acc;
-  }, {});
+function normalizeCategoryKey(value: string): string {
+  return toSlug(value).replace(/-/g, '');
+}
 
-  return Object.entries(counts).map(([id, productCount]) => ({
-    id,
-    name: toCategoryLabel(id),
-    description: '',
-    icon: '',
-    productCount,
-  }));
+function getCategoryKeys(category: Category): string[] {
+  const aliases: Record<string, string[]> = {
+    airdrops: ['airdrop', 'airdrops', 'air-freshener', 'airfreshener', 'air-fresheners', 'airfresheners'],
+    handwash: ['hand-wash', 'handwashes', 'hand-washes', 'handwash-liquid'],
+    toiletries: ['toiletry', 'personal-care', 'personalcare'],
+  };
+
+  const keys = [category.id, category.name, ...(aliases[category.id] || [])];
+  return Array.from(new Set(keys.map(normalizeCategoryKey).filter(Boolean)));
 }
 
 export function ProductsPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>(mainCategories);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,18 +38,52 @@ export function ProductsPage() {
     async function loadCategories() {
       setLoading(true);
       try {
-        const [categoriesResult, productsResult] = await Promise.allSettled([
-          api.getCategories(),
-          api.getProducts(),
-        ]);
+        const categoryKeys = new Map<string, string[]>(
+          mainCategories.map((category) => [category.id, getCategoryKeys(category)])
+        );
+        const counts = new Map<string, number>();
 
-        const categoriesFromApi =
-          categoriesResult.status === 'fulfilled'
-            ? categoriesResult.value.filter((category) => Number(category.productCount || 0) > 0)
-            : [];
-        const categoriesFromProducts =
-          productsResult.status === 'fulfilled' ? deriveCategoriesFromProducts(productsResult.value) : [];
-        const nextCategories = categoriesFromApi.length > 0 ? categoriesFromApi : categoriesFromProducts;
+        try {
+          const products = await api.getProducts();
+          products.forEach((product) => {
+            const productKey = normalizeCategoryKey(product.category || '');
+            if (!productKey) return;
+            const matchedCategory = mainCategories.find((category) =>
+              (categoryKeys.get(category.id) || []).includes(productKey)
+            );
+            if (!matchedCategory) return;
+            counts.set(matchedCategory.id, (counts.get(matchedCategory.id) || 0) + 1);
+          });
+        } catch (productsError) {
+          console.error('Error loading categories from products:', productsError);
+        }
+
+        if (counts.size === 0) {
+          try {
+            const dbCategories = await api.getCategories();
+            dbCategories.forEach((dbCategory) => {
+              const dbKeys = [
+                normalizeCategoryKey(dbCategory.id),
+                normalizeCategoryKey(dbCategory.name),
+              ].filter(Boolean);
+              const matchedCategory = mainCategories.find((category) =>
+                dbKeys.some((key) => (categoryKeys.get(category.id) || []).includes(key))
+              );
+              if (!matchedCategory) return;
+              counts.set(
+                matchedCategory.id,
+                Number(dbCategory.productCount || 0) || counts.get(matchedCategory.id) || 0
+              );
+            });
+          } catch (categoriesError) {
+            console.error('Error loading categories:', categoriesError);
+          }
+        }
+
+        const nextCategories = mainCategories.map((category) => ({
+          ...category,
+          productCount: counts.get(category.id) ?? category.productCount,
+        }));
 
         if (isMounted) {
           setCategories(nextCategories);
@@ -59,7 +91,7 @@ export function ProductsPage() {
       } catch (error) {
         console.error('Error loading categories:', error);
         if (isMounted) {
-          setCategories([]);
+          setCategories(mainCategories);
         }
       } finally {
         if (isMounted) {
