@@ -1,7 +1,80 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Package } from 'lucide-react';
+import { Category, Product } from '../../data/products';
+import { CategoryCard } from '../components/CategoryCard';
+import * as api from '../../services/api';
+
+function toCategoryLabel(value: string): string {
+  return String(value || '')
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function deriveCategoriesFromProducts(products: Product[]): Category[] {
+  const counts = products.reduce<Record<string, number>>((acc, product) => {
+    const key = String(product.category || '').trim();
+    if (!key) return acc;
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts).map(([id, productCount]) => ({
+    id,
+    name: toCategoryLabel(id),
+    description: '',
+    icon: '',
+    productCount,
+  }));
+}
 
 export function ProductsPage() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCategories() {
+      setLoading(true);
+      try {
+        const [categoriesResult, productsResult] = await Promise.allSettled([
+          api.getCategories(),
+          api.getProducts(),
+        ]);
+
+        const categoriesFromApi =
+          categoriesResult.status === 'fulfilled'
+            ? categoriesResult.value.filter((category) => Number(category.productCount || 0) > 0)
+            : [];
+        const categoriesFromProducts =
+          productsResult.status === 'fulfilled' ? deriveCategoriesFromProducts(productsResult.value) : [];
+        const nextCategories = categoriesFromApi.length > 0 ? categoriesFromApi : categoriesFromProducts;
+
+        if (isMounted) {
+          setCategories(nextCategories);
+        }
+      } catch (error) {
+        console.error('Error loading categories:', error);
+        if (isMounted) {
+          setCategories([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadCategories();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen pt-20">
       {/* Hero Section */}
@@ -22,6 +95,47 @@ export function ProductsPage() {
               Explore our comprehensive range of quality personal care and household products.
             </p>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Category Cards */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+              Shop by <span className="text-primary">Category</span>
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Click any category to view its products.
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading categories...</p>
+              </div>
+            </div>
+          ) : categories.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground">No categories found in database.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-16">
+              {categories.map((category, index) => (
+                <motion.div
+                  key={category.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <CategoryCard category={category} />
+                </motion.div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>
