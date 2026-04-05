@@ -12,6 +12,14 @@ function toSlug(value: string): string {
         .replace(/^-+|-+$/g, '');
 }
 
+function safeDecode(value: string): string {
+    try {
+        return decodeURIComponent(String(value || ''));
+    } catch {
+        return String(value || '');
+    }
+}
+
 function normalizeCategory(raw: any): Category {
     const id = String(raw?.id || raw?.categoryId || toSlug(raw?.name || '')).trim();
     return {
@@ -102,7 +110,7 @@ function normalizeProduct(raw: any): Product {
 }
 
 function normalizeCategoryKey(value: string): string {
-    return toSlug(value).replace(/-/g, '');
+    return toSlug(safeDecode(value)).replace(/-/g, '');
 }
 
 function getCategoryAliases(categoryId: string): string[] {
@@ -197,10 +205,12 @@ export async function getProducts(): Promise<Product[]> {
 
 // Get products by category
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
+    const normalizedCategoryId = safeDecode(categoryId);
+
     // Prefer all-products + local matching for resilience against backend category format mismatch.
     try {
         const allProducts = await getProducts();
-        const matched = allProducts.filter((item) => categoryMatches(categoryId, item.category));
+        const matched = allProducts.filter((item) => categoryMatches(normalizedCategoryId, item.category));
         if (matched.length > 0) {
             return matched;
         }
@@ -209,16 +219,16 @@ export async function getProductsByCategory(categoryId: string): Promise<Product
     }
 
     try {
-        const products = await fetchAPI<any[]>(`/products/category/${categoryId}`);
+        const products = await fetchAPI<any[]>(`/products/category/${encodeURIComponent(normalizedCategoryId)}`);
         const normalized = Array.isArray(products) ? products.map(normalizeProduct).filter((item) => item.id) : [];
         const matchedFromCategoryEndpoint = normalized.filter((item) =>
-            categoryMatches(categoryId, item.category)
+            categoryMatches(normalizedCategoryId, item.category)
         );
         return matchedFromCategoryEndpoint;
     } catch {
         try {
             const products = await getProducts();
-            const matched = products.filter((item) => categoryMatches(categoryId, item.category));
+            const matched = products.filter((item) => categoryMatches(normalizedCategoryId, item.category));
             return matched;
         } catch {
             return [];

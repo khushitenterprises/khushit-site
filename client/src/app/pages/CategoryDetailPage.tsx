@@ -14,6 +14,14 @@ function toSlug(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(String(value || ''));
+  } catch {
+    return String(value || '');
+  }
+}
+
 function resolveDatabaseCategory(routeCategoryId: string, categories: Category[]): Category | null {
   const aliases: Record<string, string[]> = {
     'bath-soaps': ['bath-soap', 'bathsoap', 'bathsoaps', 'soap', 'soaps'],
@@ -37,6 +45,7 @@ function resolveDatabaseCategory(routeCategoryId: string, categories: Category[]
 
 export function CategoryDetailPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
+  const decodedCategoryId = safeDecode(categoryId || '');
 
   const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,19 +59,19 @@ export function CategoryDetailPage() {
       try {
         setLoading(true);
         const [productsResult, categoriesResult] = await Promise.allSettled([
-          api.getProductsByCategory(categoryId),
+          api.getProductsByCategory(decodedCategoryId),
           api.getCategories(),
         ]);
         const nextProducts = productsResult.status === 'fulfilled' ? productsResult.value : [];
         const resolvedCategory =
           categoriesResult.status === 'fulfilled'
-            ? resolveDatabaseCategory(categoryId, categoriesResult.value)
+            ? resolveDatabaseCategory(decodedCategoryId, categoriesResult.value)
             : null;
         const nextCategory =
           resolvedCategory ||
           ({
-            id: categoryId,
-            name: categoryId.replace(/-/g, ' '),
+            id: decodedCategoryId,
+            name: decodedCategoryId.replace(/-/g, ' '),
             description: '',
             icon: '',
             productCount: nextProducts.length,
@@ -82,7 +91,7 @@ export function CategoryDetailPage() {
     }
 
     fetchData();
-  }, [categoryId]);
+  }, [categoryId, decodedCategoryId]);
 
   // Loading state
   if (loading) {
