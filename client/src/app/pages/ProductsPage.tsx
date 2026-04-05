@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { CategoryCard } from '../components/CategoryCard';
-import { ProductCard } from '../components/ProductCard';
 import { Category, Product } from '../../data/products';
 import * as api from '../../services/api';
 import { Package } from 'lucide-react';
@@ -16,13 +15,20 @@ export function ProductsPage() {
     async function fetchProducts() {
       try {
         setLoading(true);
-        const [categoriesData, productsData] = await Promise.all([
+        const [categoriesResult, productsResult] = await Promise.allSettled([
           api.getCategories(),
           api.getProducts()
         ]);
+
+        const categoriesData = categoriesResult.status === 'fulfilled' ? categoriesResult.value : [];
+        const productsData = productsResult.status === 'fulfilled' ? productsResult.value : [];
+
+        console.log('[ProductsPage] categories:', categoriesData.length, categoriesData);
+        console.log('[ProductsPage] products:', productsData.length, productsData);
+
         setCategories(categoriesData);
         setProducts(productsData);
-        setError(null);
+        setError(categoriesResult.status === 'rejected' && productsResult.status === 'rejected' ? 'Failed to load products' : null);
       } catch (err) {
         setError('Failed to load products');
         console.error('Error fetching products:', err);

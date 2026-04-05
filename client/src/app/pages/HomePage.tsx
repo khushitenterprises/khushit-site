@@ -25,6 +25,8 @@ export function HomePage() {
           api.getCategories(),
           api.getFeaturedProducts()
         ]);
+        console.log('[HomePage] categories:', categoriesData.length, categoriesData);
+        console.log('[HomePage] featuredProducts:', productsData.length, productsData);
         setCategories(categoriesData);
         setFeaturedProducts(productsData);
         setError(null);

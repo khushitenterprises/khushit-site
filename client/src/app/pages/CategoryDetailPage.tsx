@@ -4,10 +4,19 @@ import { motion } from 'motion/react';
 import { ProductCard } from '../components/ProductCard';
 import { Product, Category } from '../../data/products';
 import * as api from '../../services/api';
-import { ChevronRight, Filter } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(String(value || ''));
+  } catch {
+    return String(value || '');
+  }
+}
 
 export function CategoryDetailPage() {
   const { categoryId } = useParams<{ categoryId: string }>();
+  const decodedCategoryId = safeDecode(categoryId || '');
 
   const [category, setCategory] = useState<Category | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -17,18 +26,34 @@ export function CategoryDetailPage() {
 
   useEffect(() => {
     async function fetchData() {
-      if (!categoryId) return;
+      if (!decodedCategoryId) return;
 
       try {
         setLoading(true);
-        const [categoryData, productsData] = await Promise.all([
-          api.getCategoryById(categoryId),
-          api.getProductsByCategory(categoryId)
+        const [categoryResult, productsResult] = await Promise.allSettled([
+          api.getCategoryById(decodedCategoryId),
+          api.getProductsByCategory(decodedCategoryId)
         ]);
+
+        const productsData = productsResult.status === 'fulfilled' ? productsResult.value : [];
+        console.log('[CategoryDetailPage] categoryId:', decodedCategoryId);
+        console.log('[CategoryDetailPage] products:', productsData.length, productsData);
+
+        const categoryData =
+          categoryResult.status === 'fulfilled'
+            ? categoryResult.value
+            : ({
+                id: decodedCategoryId,
+                name: decodedCategoryId.replace(/-/g, ' '),
+                description: '',
+                icon: '',
+                productCount: productsData.length,
+              } as Category);
+
         setCategory(categoryData);
         setProducts(productsData);
         setFilteredProducts(productsData);
-        setError(null);
+        setError(productsResult.status === 'rejected' ? 'Failed to load category products' : null);
       } catch (err) {
         setError('Failed to load category data');
         console.error('Error fetching category data:', err);
@@ -38,7 +63,7 @@ export function CategoryDetailPage() {
     }
 
     fetchData();
-  }, [categoryId]);
+  }, [decodedCategoryId]);
 
   // Loading state
   if (loading) {

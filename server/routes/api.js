@@ -178,7 +178,13 @@ async function getProductsData() {
 
     if (categories.length === 0 || products.length === 0) {
         const dataPath = path.join(__dirname, '../data/products.json');
-        const data = JSON.parse(await fs.readFile(dataPath, 'utf-8'));
+        let data = { categories: [], products: [] };
+        try {
+            const fileContent = await fs.readFile(dataPath, 'utf-8');
+            data = JSON.parse(fileContent);
+        } catch (error) {
+            console.warn(`Seed data file unavailable at ${dataPath}. Continuing with existing DB data.`, error.message);
+        }
 
         if (categories.length === 0 && data.categories?.length) {
             await db.collection('categories').insertMany(data.categories);
