@@ -82,12 +82,16 @@ function normalizeProduct(raw: any): Product {
             'category_id',
         ]) || ''
     ).trim();
+    const normalizedPrice = String(
+        pickRawField(raw, ['price', 'mrp', 'rate', 'amount', 'sellingPrice', 'selling_price']) || ''
+    ).trim();
 
     return {
         id: String(pickRawField(raw, ['id', 'productId', 'product_id']) || toSlug(name) || `product-${Date.now()}`).trim(),
         name,
         description: String(pickRawField(raw, ['description', 'productDescription', 'product_description']) || '').trim(),
         category: normalizedCategory || 'uncategorized',
+        price: normalizedPrice || undefined,
         variant: pickRawField(raw, ['variant']) ? String(pickRawField(raw, ['variant'])).trim() : undefined,
         image,
         keyBenefits: Array.isArray(raw?.keyBenefits) ? raw.keyBenefits.map((item: any) => String(item)) : undefined,
