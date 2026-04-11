@@ -117,7 +117,7 @@ export function AdminPage() {
             return '';
         }
 
-        return `Basic ${btoa(`${email}:${password}`)}`;
+        return `Basic ${btoa(`${email.trim()}:${password}`)}`;
     }, [email, password]);
 
     const resetProductForm = () => {
