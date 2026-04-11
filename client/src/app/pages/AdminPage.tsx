@@ -120,6 +120,17 @@ export function AdminPage() {
         return `Basic ${btoa(`${email.trim()}:${password}`)}`;
     }, [email, password]);
 
+    const getProductDisplayName = (product: Product) => {
+        const candidateNames = [
+            product.name,
+            (product as Product & { productName?: string }).productName,
+            (product as Product & { title?: string }).title
+        ];
+
+        const resolved = candidateNames.find((value) => typeof value === 'string' && value.trim().length > 0);
+        return resolved?.trim() || 'Unnamed Product';
+    };
+
     const resetProductForm = () => {
         setProductForm(INITIAL_PRODUCT_FORM);
         setImageFile(null);
@@ -380,9 +391,10 @@ export function AdminPage() {
     };
 
     const handleEditProduct = (product: Product) => {
+        const displayName = getProductDisplayName(product);
         setEditingProductId(product.id);
         setProductForm({
-            name: product.name,
+            name: displayName,
             description: product.description,
             category: product.category,
             existingImage: product.image || '',
@@ -399,7 +411,7 @@ export function AdminPage() {
             return;
         }
 
-        const confirmed = window.confirm(`Delete product "${product.name}"?`);
+        const confirmed = window.confirm(`Delete product "${getProductDisplayName(product)}"?`);
         if (!confirmed) {
             return;
         }
@@ -888,7 +900,7 @@ export function AdminPage() {
                             <tbody>
                                 {products.map((product) => (
                                     <tr key={product.id} className="border-b border-border/60 align-top">
-                                        <td className="py-2 pr-4 whitespace-nowrap">{product.name}</td>
+                                        <td className="py-2 pr-4 whitespace-nowrap">{getProductDisplayName(product)}</td>
                                         <td className="py-2 pr-4 whitespace-nowrap">{product.category}</td>
                                         <td className="py-2 pr-4 whitespace-nowrap">{product.id}</td>
                                         <td className="py-2 pr-4">
