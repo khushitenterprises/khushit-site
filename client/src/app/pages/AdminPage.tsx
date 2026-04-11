@@ -894,7 +894,7 @@ export function AdminPage() {
                                         <td className="py-2 pr-4">
                                             <div className="flex flex-wrap gap-2">
                                                 <Button type="button" onClick={() => handleEditProduct(product)}>
-                                                    Edit
+                                                    Update
                                                 </Button>
                                                 <Button
                                                     type="button"
