@@ -34,7 +34,7 @@ export const categories: Category[] = [
   },
   {
     id: 'fabric-conditioner',
-    name: 'Fabric Conditioner',
+    name: 'Fabric Care',
     description: 'Soft and fragrant fabric care solutions',
     icon: '👕',
     productCount: 10

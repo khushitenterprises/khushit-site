@@ -34,7 +34,7 @@ const codeSliderImages: SliderImage[] = [
     id: 'sld_fabric',
     src: '/fabric-conditioner-banner.jpg',
     alt: 'Fabric conditioner banner',
-    title: 'Fabric Conditioner',
+    title: 'Fabric Care',
     link: '/products/fabric-conditioner',
   },
   {

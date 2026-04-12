@@ -260,10 +260,14 @@ function withDynamicProductCounts(categories = [], products = []) {
         return acc;
     }, {});
 
-    return categories.map((category) => ({
-        ...category,
-        productCount: countsByCategory[category.id] || 0
-    }));
+    return categories.map((category) => {
+        const normalizedName = category.id === 'fabric-conditioner' ? 'Fabric Care' : category.name;
+        return {
+            ...category,
+            name: normalizedName,
+            productCount: countsByCategory[category.id] || 0
+        };
+    });
 }
 
 async function getSlidersData() {

@@ -189,11 +189,18 @@ export function AdminPage() {
                 }
             });
 
+            const json = await response.json().catch(() => null);
             if (!response.ok) {
-                throw new Error('Unable to load products');
+                const errorMessage =
+                    json && typeof json.error === 'string'
+                        ? json.error
+                        : response.status === 401
+                          ? 'Unauthorized. Please log in again.'
+                          : 'Unable to load products';
+                throw new Error(errorMessage);
             }
 
-            const data = (await response.json()) as Product[];
+            const data = Array.isArray(json) ? (json as Product[]) : [];
             setProducts(data);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to load products';
