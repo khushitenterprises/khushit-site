@@ -66,9 +66,9 @@ export function Footer({ onRegisterClick }: FooterProps) {
                 </a>
               </li>
               <li>
-                <a href="tel:+918140074714" className="flex items-center gap-2 hover:text-primary transition-colors">
+                <a href="tel:+918140075714" className="flex items-center gap-2 hover:text-primary transition-colors">
                   <Phone className="w-5 h-5 text-primary flex-shrink-0" />
-                  <span className="text-gray-300">+91 8140074714</span>
+                  <span className="text-gray-300">+91 8140075714</span>
                 </a>
               </li>
               <li>
